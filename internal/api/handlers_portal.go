@@ -38,6 +38,10 @@ func (h *Handler) CreateLinkRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
+	if !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+		http.Error(w, "Gateway not eligible for remote portal", http.StatusForbidden)
+		return
+	}
 
 	var body linkRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.MachineSerial == "" {
@@ -71,7 +75,8 @@ func (h *Handler) LinkRequestStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	portalAccess := lr.Status == domain.LinkStatusApproved &&
-		user.LinkedMachineID != nil && user.LinkedGatewayID != nil
+		user.LinkedMachineID != nil && user.LinkedGatewayID != nil &&
+		domain.IsRemoteEligibleGateway(user.LinkedGatewayID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"link_request":        lr,
 		"linked_machine_id":   user.LinkedMachineID,
@@ -108,6 +113,10 @@ func (h *Handler) Inject(w http.ResponseWriter, r *http.Request) {
 	approved, _ := h.store.UserHasApprovedLink(r.Context(), user.ID)
 	if !approved || user.LinkedMachineID == nil {
 		http.Error(w, "Portal access not approved", http.StatusForbidden)
+		return
+	}
+	if !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+		http.Error(w, "Gateway not eligible for remote portal", http.StatusForbidden)
 		return
 	}
 
