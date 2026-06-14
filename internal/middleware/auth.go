@@ -86,17 +86,19 @@ func AdminJWT(next http.Handler) http.Handler {
 }
 
 func GatewayAuth(store interface {
-	ValidateGatewayToken(ctx context.Context, gatewayID, token string) bool
+	ValidateGatewayRequest(ctx context.Context, gatewayID, token, eth0Mac, eth1Mac string) bool
 }) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			gatewayID := r.Header.Get("X-Gateway-ID")
 			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			eth0 := r.Header.Get("X-Gateway-Eth0-MAC")
+			eth1 := r.Header.Get("X-Gateway-Eth1-MAC")
 			if gatewayID == "" || token == "" {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
-			if !store.ValidateGatewayToken(r.Context(), gatewayID, token) {
+			if !store.ValidateGatewayRequest(r.Context(), gatewayID, token, eth0, eth1) {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}

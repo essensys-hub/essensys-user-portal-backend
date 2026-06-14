@@ -21,13 +21,17 @@ func NewPortalStore(db *sqlx.DB) *PortalStore {
 	return &PortalStore{db: db}
 }
 
-func (s *PortalStore) RunMigrations(path string) error {
-	sqlBytes, err := os.ReadFile(path)
-	if err != nil {
-		return err
+func (s *PortalStore) RunMigrations(paths ...string) error {
+	for _, path := range paths {
+		sqlBytes, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		if _, err := s.db.Exec(string(sqlBytes)); err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
 	}
-	_, err = s.db.Exec(string(sqlBytes))
-	return err
+	return nil
 }
 
 func hashToken(token string) string {
@@ -116,6 +120,9 @@ func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gateway
 	if err != nil || sess == nil {
 		return nil, fmt.Errorf("unknown gateway")
 	}
+	if sess.MachineID == nil {
+		return nil, fmt.Errorf("gateway %s has no machine_id — re-register with triplet", gatewayID)
+	}
 
 	var rows []struct {
 		GUID      string    `db:"guid"`
@@ -129,20 +136,10 @@ func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gateway
 	query := `
 		SELECT guid, user_id, machine_id, params, status, created_at
 		FROM cloud_actions
-		WHERE status = $1
+		WHERE status = $1 AND machine_id = $3
 		ORDER BY created_at ASC
 		LIMIT $2`
-	if sess.MachineID != nil {
-		query = `
-		SELECT guid, user_id, machine_id, params, status, created_at
-		FROM cloud_actions
-		WHERE status = $1 AND (machine_id IS NULL OR machine_id = $3)
-		ORDER BY created_at ASC
-		LIMIT $2`
-		err = s.db.SelectContext(ctx, &rows, query, domain.ActionStatusPending, limit, *sess.MachineID)
-	} else {
-		err = s.db.SelectContext(ctx, &rows, query, domain.ActionStatusPending, limit)
-	}
+	err = s.db.SelectContext(ctx, &rows, query, domain.ActionStatusPending, limit, *sess.MachineID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,29 +175,74 @@ func (s *PortalStore) MarkActionDone(ctx context.Context, guid string) error {
 	return nil
 }
 
-func (s *PortalStore) RegisterGatewaySession(ctx context.Context, gatewayID, token string, machineID *int) error {
-	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO gateway_sessions (gateway_id, token_hash, machine_id, last_seen)
-		VALUES ($1, $2, $3, NOW())
-		ON CONFLICT (gateway_id) DO UPDATE SET token_hash = $2, machine_id = $3`,
-		gatewayID, hashToken(token), machineID)
+type GatewayRegistration struct {
+	GatewayID string
+	Token     string
+	MachineID int
+	Eth0MAC   string
+	Eth1MAC   string
+}
+
+func (s *PortalStore) RegisterGatewaySession(ctx context.Context, reg GatewayRegistration) error {
+	eth0, err := NormalizeMAC(reg.Eth0MAC)
+	if err != nil {
+		return fmt.Errorf("eth0_mac: %w", err)
+	}
+	eth1, err := NormalizeMAC(reg.Eth1MAC)
+	if err != nil {
+		return fmt.Errorf("eth1_mac: %w", err)
+	}
+	if reg.MachineID <= 0 {
+		return fmt.Errorf("machine_id required")
+	}
+	gatewayID := reg.GatewayID
+	if gatewayID == "" {
+		gatewayID, err = GatewayIDFromEth0MAC(eth0)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO gateway_sessions (gateway_id, token_hash, machine_id, eth0_mac, eth1_mac, last_seen)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+		ON CONFLICT (gateway_id) DO UPDATE SET
+			token_hash = $2, machine_id = $3, eth0_mac = $4, eth1_mac = $5`,
+		gatewayID, hashToken(reg.Token), reg.MachineID, eth0, eth1)
 	return err
 }
 
-func (s *PortalStore) ValidateGatewayToken(ctx context.Context, gatewayID, token string) bool {
-	var stored string
-	err := s.db.GetContext(ctx, &stored, `
-		SELECT token_hash FROM gateway_sessions WHERE gateway_id = $1`, gatewayID)
+func (s *PortalStore) ValidateGatewayRequest(ctx context.Context, gatewayID, token, eth0Raw, eth1Raw string) bool {
+	sess, err := s.GetGatewaySession(ctx, gatewayID)
+	if err != nil || sess == nil {
+		return false
+	}
+	if sess.TokenHash != hashToken(token) {
+		return false
+	}
+	if sess.Eth0MAC == nil || sess.Eth1MAC == nil {
+		// Legacy session without MAC triplet — token only
+		return true
+	}
+	eth0, err := NormalizeMAC(eth0Raw)
 	if err != nil {
 		return false
 	}
-	return stored == hashToken(token)
+	eth1, err := NormalizeMAC(eth1Raw)
+	if err != nil {
+		return false
+	}
+	return eth0 == *sess.Eth0MAC && eth1 == *sess.Eth1MAC
+}
+
+func (s *PortalStore) ValidateGatewayToken(ctx context.Context, gatewayID, token string) bool {
+	return s.ValidateGatewayRequest(ctx, gatewayID, token, "", "")
 }
 
 func (s *PortalStore) GetGatewaySession(ctx context.Context, gatewayID string) (*domain.GatewaySession, error) {
 	var gs domain.GatewaySession
 	err := s.db.GetContext(ctx, &gs, `
-		SELECT gateway_id, token_hash, machine_id, last_seen FROM gateway_sessions WHERE gateway_id = $1`, gatewayID)
+		SELECT gateway_id, token_hash, machine_id, eth0_mac, eth1_mac, last_seen
+		FROM gateway_sessions WHERE gateway_id = $1`, gatewayID)
 	if err != nil {
 		return nil, err
 	}

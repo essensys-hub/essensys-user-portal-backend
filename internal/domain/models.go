@@ -26,6 +26,8 @@ type GatewaySession struct {
 	GatewayID string     `db:"gateway_id" json:"gateway_id"`
 	TokenHash string     `db:"token_hash" json:"-"`
 	MachineID *int       `db:"machine_id" json:"machine_id,omitempty"`
+	Eth0MAC   *string    `db:"eth0_mac" json:"eth0_mac,omitempty"`
+	Eth1MAC   *string    `db:"eth1_mac" json:"eth1_mac,omitempty"`
 	LastSeen  *time.Time `db:"last_seen" json:"last_seen,omitempty"`
 }
 

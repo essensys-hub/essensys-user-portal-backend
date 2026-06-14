@@ -25,7 +25,7 @@ func NewRouter(store *data.PortalStore) http.Handler {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{allowedOrigin},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Gateway-ID"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Gateway-ID", "X-Gateway-Eth0-MAC", "X-Gateway-Eth1-MAC"},
 		AllowCredentials: true,
 	}))
 

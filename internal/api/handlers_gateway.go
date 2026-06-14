@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/go-chi/chi/v5"
@@ -46,20 +47,44 @@ func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
 }
 
 type registerGatewayBody struct {
-	GatewayID string `json:"gateway_id"`
+	GatewayID string `json:"gateway_id,omitempty"`
 	Token     string `json:"token"`
-	MachineID *int   `json:"machine_id,omitempty"`
+	MachineID int    `json:"machine_id"`
+	Eth0MAC   string `json:"eth0_mac"`
+	Eth1MAC   string `json:"eth1_mac"`
 }
 
 func (h *Handler) RegisterGateway(w http.ResponseWriter, r *http.Request) {
 	var body registerGatewayBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.GatewayID == "" || body.Token == "" {
-		http.Error(w, "gateway_id and token required", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" {
+		http.Error(w, "token, machine_id, eth0_mac, eth1_mac required", http.StatusBadRequest)
 		return
 	}
-	if err := h.store.RegisterGatewaySession(r.Context(), body.GatewayID, body.Token, body.MachineID); err != nil {
-		http.Error(w, "Register failed", http.StatusInternalServerError)
+	if body.MachineID <= 0 || body.Eth0MAC == "" || body.Eth1MAC == "" {
+		http.Error(w, "token, machine_id, eth0_mac, eth1_mac required", http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"gateway_id": body.GatewayID})
+	reg := data.GatewayRegistration{
+		GatewayID: body.GatewayID,
+		Token:     body.Token,
+		MachineID: body.MachineID,
+		Eth0MAC:   body.Eth0MAC,
+		Eth1MAC:   body.Eth1MAC,
+	}
+	if err := h.store.RegisterGatewaySession(r.Context(), reg); err != nil {
+		http.Error(w, "Register failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	gatewayID := body.GatewayID
+	if gatewayID == "" {
+		gatewayID, _ = data.GatewayIDFromEth0MAC(body.Eth0MAC)
+	}
+	eth0, _ := data.NormalizeMAC(body.Eth0MAC)
+	eth1, _ := data.NormalizeMAC(body.Eth1MAC)
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"gateway_id": gatewayID,
+		"machine_id": body.MachineID,
+		"eth0_mac":   eth0,
+		"eth1_mac":   eth1,
+	})
 }
