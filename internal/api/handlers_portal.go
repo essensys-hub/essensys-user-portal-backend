@@ -66,18 +66,19 @@ func (h *Handler) LinkRequestStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	lr, err := h.store.GetLatestLinkRequest(r.Context(), user.ID)
+	approved, _ := h.store.UserHasApprovedLink(r.Context(), user.ID)
+	portalAccess := approved &&
+		user.LinkedMachineID != nil && user.LinkedGatewayID != nil &&
+		domain.IsRemoteEligibleGateway(user.LinkedGatewayID)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":              "none",
 			"linked_machine_id":   user.LinkedMachineID,
 			"linked_gateway_id":   user.LinkedGatewayID,
-			"portal_access":       false,
+			"portal_access":       portalAccess,
 		})
 		return
 	}
-	portalAccess := lr.Status == domain.LinkStatusApproved &&
-		user.LinkedMachineID != nil && user.LinkedGatewayID != nil &&
-		domain.IsRemoteEligibleGateway(user.LinkedGatewayID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"link_request":        lr,
 		"linked_machine_id":   user.LinkedMachineID,
@@ -146,6 +147,9 @@ func (h *Handler) ListPendingLinkRequests(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		http.Error(w, "List failed", http.StatusInternalServerError)
 		return
+	}
+	if rows == nil {
+		rows = []domain.LinkRequest{}
 	}
 	writeJSON(w, http.StatusOK, rows)
 }
