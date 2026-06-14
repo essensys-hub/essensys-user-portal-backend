@@ -88,3 +88,15 @@ func (h *Handler) RegisterGateway(w http.ResponseWriter, r *http.Request) {
 		"eth1_mac":   eth1,
 	})
 }
+
+func (h *Handler) ListGatewaySessions(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.store.ListGatewaySessions(r.Context())
+	if err != nil {
+		http.Error(w, "List failed", http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []domain.GatewaySession{}
+	}
+	writeJSON(w, http.StatusOK, rows)
+}

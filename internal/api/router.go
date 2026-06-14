@@ -44,6 +44,7 @@ func NewRouter(store *data.PortalStore) http.Handler {
 			r.Use(middleware.AdminJWT)
 			r.Get("/link-requests", h.ListPendingLinkRequests)
 			r.Put("/link-requests/{id}", h.ReviewLinkRequest)
+			r.Get("/gateway-sessions", h.ListGatewaySessions)
 			r.Post("/gateways/register", h.RegisterGateway)
 		})
 	})

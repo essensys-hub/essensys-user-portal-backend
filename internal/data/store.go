@@ -249,6 +249,15 @@ func (s *PortalStore) GetGatewaySession(ctx context.Context, gatewayID string) (
 	return &gs, nil
 }
 
+func (s *PortalStore) ListGatewaySessions(ctx context.Context) ([]domain.GatewaySession, error) {
+	var rows []domain.GatewaySession
+	err := s.db.SelectContext(ctx, &rows, `
+		SELECT gateway_id, machine_id, eth0_mac, eth1_mac, last_seen
+		FROM gateway_sessions
+		ORDER BY last_seen DESC NULLS LAST`)
+	return rows, err
+}
+
 func (s *PortalStore) TouchGatewayHeartbeat(ctx context.Context, gatewayID string) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE gateway_sessions SET last_seen = NOW() WHERE gateway_id = $1`, gatewayID)
