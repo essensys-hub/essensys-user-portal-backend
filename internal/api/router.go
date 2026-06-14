@@ -39,6 +39,9 @@ func NewRouter(store *data.PortalStore) http.Handler {
 		r.Get("/link-request/status", h.LinkRequestStatus)
 		r.Get("/gateway/status", h.GatewayStatus)
 		r.With(injectLimiter.Middleware).Post("/inject", h.Inject)
+		r.Get("/exchange", h.GetExchange)
+		r.Get("/history/latest", h.GetHistoryLatest)
+		r.Post("/web/actions", h.PostWebActions)
 
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(middleware.AdminJWT)

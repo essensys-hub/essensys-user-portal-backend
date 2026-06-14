@@ -115,6 +115,34 @@ func (s *PortalStore) EnqueueCloudAction(ctx context.Context, guid string, userI
 	return err
 }
 
+func (s *PortalStore) GetLastCloudActionForUser(ctx context.Context, userID int) (*domain.CloudAction, error) {
+	var row struct {
+		GUID      string    `db:"guid"`
+		UserID    int       `db:"user_id"`
+		MachineID *int      `db:"machine_id"`
+		Params    []byte    `db:"params"`
+		Status    string    `db:"status"`
+		CreatedAt time.Time `db:"created_at"`
+	}
+	err := s.db.GetContext(ctx, &row, `
+		SELECT guid, user_id, machine_id, params, status, created_at
+		FROM cloud_actions
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	var params []domain.ExchangeKV
+	if err := json.Unmarshal(row.Params, &params); err != nil {
+		return nil, err
+	}
+	return &domain.CloudAction{
+		GUID: row.GUID, UserID: row.UserID, MachineID: row.MachineID,
+		Params: params, Status: row.Status, CreatedAt: row.CreatedAt,
+	}, nil
+}
+
 func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gatewayID string, limit int) ([]domain.CloudAction, error) {
 	sess, err := s.GetGatewaySession(ctx, gatewayID)
 	if err != nil || sess == nil {

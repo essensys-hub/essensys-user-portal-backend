@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -173,6 +174,107 @@ func (h *Handler) ReviewLinkRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": body.Status})
+}
+
+func (h *Handler) GetExchange(w http.ResponseWriter, r *http.Request) {
+	if !h.requirePortalAccess(w, r) {
+		return
+	}
+	keysParam := r.URL.Query().Get("keys")
+	if keysParam == "" {
+		http.Error(w, "Missing keys", http.StatusBadRequest)
+		return
+	}
+	// État temps réel via mystatus reste sur la gateway — stub vide pour compat UI.
+	writeJSON(w, http.StatusOK, map[string]any{"values": []domain.ExchangeKV{}})
+}
+
+func (h *Handler) GetHistoryLatest(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(middleware.UserEmailKey).(string)
+	user, err := h.store.GetUserByEmail(r.Context(), email)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	action, err := h.store.GetLastCloudActionForUser(r.Context(), user.ID)
+	if err != nil || action == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"lastAction": nil, "message": "No actions yet"})
+		return
+	}
+	info := fmt.Sprintf("Cloud action (%d params)", len(action.Params))
+	if len(action.Params) > 0 {
+		info = fmt.Sprintf("k=%d", action.Params[0].K)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"lastAction": map[string]any{
+			"guid":       action.GUID,
+			"actionType": "CLOUD",
+			"actionInfo": info,
+			"isDone":     action.Status == domain.ActionStatusDone,
+			"timestamp":  action.CreatedAt.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+func (h *Handler) PostWebActions(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(middleware.UserEmailKey).(string)
+	user, err := h.store.GetUserByEmail(r.Context(), email)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	if !h.userPortalAccess(r.Context(), user) {
+		http.Error(w, "Portal access not approved", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		Alarme     string `json:"alarme"`
+		CodeAlarme string `json:"codealarme"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.Alarme == "" || len(req.CodeAlarme) != 4 {
+		http.Error(w, "alarme and 4-digit codealarme required", http.StatusBadRequest)
+		return
+	}
+	cmd := "0"
+	if req.Alarme == "on" {
+		cmd = "1"
+	}
+	params := []domain.ExchangeKV{
+		{K: 409, V: cmd},
+		{K: 410, V: req.CodeAlarme[0:2]},
+		{K: 411, V: req.CodeAlarme[2:4]},
+		{K: 307, V: "0"},
+	}
+	guid := newGUID()
+	if err := h.store.EnqueueCloudAction(r.Context(), guid, user.ID, user.LinkedMachineID, params); err != nil {
+		http.Error(w, "Enqueue failed", http.StatusInternalServerError)
+		return
+	}
+	_ = h.store.AuditLog(r.Context(), email, "portal_alarm", map[string]any{"guid": guid, "alarme": req.Alarme})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "message": "Action sent to queue"})
+}
+
+func (h *Handler) requirePortalAccess(w http.ResponseWriter, r *http.Request) bool {
+	email := r.Context().Value(middleware.UserEmailKey).(string)
+	user, err := h.store.GetUserByEmail(r.Context(), email)
+	if err != nil || !h.userPortalAccess(r.Context(), user) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+func (h *Handler) userPortalAccess(ctx context.Context, user *domain.UserProfile) bool {
+	if user == nil || user.LinkedMachineID == nil || !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+		return false
+	}
+	ok, _ := h.store.UserHasApprovedLink(ctx, user.ID)
+	return ok
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
