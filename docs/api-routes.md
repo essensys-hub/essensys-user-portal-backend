@@ -53,6 +53,7 @@ Headers gateway : `X-Gateway-ID`, `Authorization: Bearer`, `X-Gateway-Eth0-MAC`,
 | Méthode | Route | Basic Auth |
 |---------|-------|------------|
 | POST | `/mystatus` | strict |
-| GET | `/myactions` | strict → `{}` |
+| GET | `/myactions` | strict → `cloud_actions` pending pour la machine |
+| POST | `/done/{guid}` | strict → acquittement firmware |
 | GET | `/serverinfos` | optional |
 | POST | `/infos` | optional (gateway push) |

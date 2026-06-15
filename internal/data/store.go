@@ -143,15 +143,10 @@ func (s *PortalStore) GetLastCloudActionForUser(ctx context.Context, userID int)
 	}, nil
 }
 
-func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gatewayID string, limit int) ([]domain.CloudAction, error) {
-	sess, err := s.GetGatewaySession(ctx, gatewayID)
-	if err != nil || sess == nil {
-		return nil, fmt.Errorf("unknown gateway")
+func (s *PortalStore) FetchPendingActionsForMachine(ctx context.Context, machineID int, limit int) ([]domain.CloudAction, error) {
+	if limit <= 0 {
+		limit = 20
 	}
-	if sess.MachineID == nil {
-		return nil, fmt.Errorf("gateway %s has no machine_id — re-register with triplet", gatewayID)
-	}
-
 	var rows []struct {
 		GUID      string    `db:"guid"`
 		UserID    int       `db:"user_id"`
@@ -160,14 +155,12 @@ func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gateway
 		Status    string    `db:"status"`
 		CreatedAt time.Time `db:"created_at"`
 	}
-
-	query := `
+	err := s.db.SelectContext(ctx, &rows, `
 		SELECT guid, user_id, machine_id, params, status, created_at
 		FROM cloud_actions
 		WHERE status = $1 AND machine_id = $3
 		ORDER BY created_at ASC
-		LIMIT $2`
-	err = s.db.SelectContext(ctx, &rows, query, domain.ActionStatusPending, limit, *sess.MachineID)
+		LIMIT $2`, domain.ActionStatusPending, limit, machineID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +180,31 @@ func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gateway
 			domain.ActionStatusDelivered, r.GUID)
 	}
 	return out, nil
+}
+
+func (s *PortalStore) MachineIDFromHashedPkey(ctx context.Context, hashedPkey string) (int, error) {
+	var clientID *string
+	err := s.db.GetContext(ctx, &clientID, `
+		SELECT client_id FROM machines WHERE hashed_pkey = $1`, hashedPkey)
+	if err != nil || clientID == nil || *clientID == "" {
+		return 0, fmt.Errorf("unknown machine")
+	}
+	var machineID int
+	if _, err := fmt.Sscanf(*clientID, "%d", &machineID); err != nil || machineID <= 0 {
+		return 0, fmt.Errorf("non-numeric client_id %q", *clientID)
+	}
+	return machineID, nil
+}
+
+func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gatewayID string, limit int) ([]domain.CloudAction, error) {
+	sess, err := s.GetGatewaySession(ctx, gatewayID)
+	if err != nil || sess == nil {
+		return nil, fmt.Errorf("unknown gateway")
+	}
+	if sess.MachineID == nil {
+		return nil, fmt.Errorf("gateway %s has no machine_id — re-register with triplet", gatewayID)
+	}
+	return s.FetchPendingActionsForMachine(ctx, *sess.MachineID, limit)
 }
 
 func (s *PortalStore) MarkActionDone(ctx context.Context, guid string) error {

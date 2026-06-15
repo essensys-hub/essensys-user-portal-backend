@@ -10,14 +10,16 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
+	"github.com/go-chi/chi/v5"
 )
 
 type Handlers struct {
-	store *data.LegacyIoTStore
+	store  *data.LegacyIoTStore
+	portal *data.PortalStore
 }
 
-func NewHandlers(store *data.LegacyIoTStore) *Handlers {
-	return &Handlers{store: store}
+func NewHandlers(store *data.LegacyIoTStore, portal *data.PortalStore) *Handlers {
+	return &Handlers{store: store, portal: portal}
 }
 
 // serverInfoIndices matches essensys-server-backend GetServerInfos (mystatus poll list).
@@ -56,8 +58,51 @@ func (h *Handlers) MyStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) MyActions(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("{}"))
+	resp := domain.LegacyActionsResponse{Actions: []domain.LegacyAction{}}
+	if h.portal != nil {
+		hashedPkey, _ := r.Context().Value(middleware.LegacyHashedPkeyKey).(string)
+		if hashedPkey != "" {
+			if machineID, err := h.portal.MachineIDFromHashedPkey(r.Context(), hashedPkey); err == nil {
+				actions, err := h.portal.FetchPendingActionsForMachine(r.Context(), machineID, 20)
+				if err != nil {
+					log.Printf("[legacyiot] myactions machine %d: %v", machineID, err)
+				} else if len(actions) > 0 {
+					resp.Actions = make([]domain.LegacyAction, 0, len(actions))
+					for _, act := range actions {
+						resp.Actions = append(resp.Actions, domain.LegacyAction{
+							GUID:   act.GUID,
+							Params: act.Params,
+						})
+					}
+					log.Printf("[legacyiot] myactions delivered %d action(s) to machine %d", len(actions), machineID)
+				}
+			}
+		}
+	}
+	w.Header().Set("Content-Type", "application/json ;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func (h *Handlers) Done(w http.ResponseWriter, r *http.Request) {
+	guid := chi.URLParam(r, "guid")
+	if guid == "" {
+		http.Error(w, "guid required", http.StatusBadRequest)
+		return
+	}
+	if h.portal == nil {
+		http.Error(w, "Not configured", http.StatusServiceUnavailable)
+		return
+	}
+	if err := h.portal.MarkActionDone(r.Context(), guid); err != nil {
+		http.Error(w, "Action not found", http.StatusNotFound)
+		return
+	}
+	clientID, _ := r.Context().Value(middleware.LegacyClientIDKey).(string)
+	log.Printf("[legacyiot] done %s from %s", guid, clientID)
+	w.Header().Set("Content-Type", "application/json ;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("{}"))
 }
 
 func (h *Handlers) GatewayInfos(w http.ResponseWriter, r *http.Request) {

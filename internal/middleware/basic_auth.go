@@ -12,6 +12,7 @@ import (
 )
 
 const LegacyClientIDKey contextKey = "clientID"
+const LegacyHashedPkeyKey contextKey = "hashedPkey"
 
 type LegacyMachineStore interface {
 	GetMachineByHashedPkey(hashedPkey string) (*domain.LegacyMachine, error)
@@ -82,6 +83,7 @@ func BasicAuth(store LegacyMachineStore, strict bool) func(http.Handler) http.Ha
 				if !strict {
 					log.Printf("BasicAuth (Lax): machine %s inactive, anonymous", machine.NoSerie)
 					ctx := context.WithValue(r.Context(), LegacyClientIDKey, "anonymous")
+					ctx = context.WithValue(ctx, LegacyHashedPkeyKey, "")
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
@@ -90,6 +92,7 @@ func BasicAuth(store LegacyMachineStore, strict bool) func(http.Handler) http.Ha
 			}
 
 			ctx := context.WithValue(r.Context(), LegacyClientIDKey, machine.NoSerie)
+			ctx = context.WithValue(ctx, LegacyHashedPkeyKey, hashedPkey)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

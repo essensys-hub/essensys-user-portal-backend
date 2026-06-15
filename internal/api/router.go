@@ -50,7 +50,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 				Inventory: inventory,
 				News:      news,
 			})
-			legacyiot.Mount(r, iot)
+			legacyiot.Mount(r, iot, store)
 		}
 	})
 
