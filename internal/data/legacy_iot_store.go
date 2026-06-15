@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/geo"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -61,6 +62,11 @@ func (s *LegacyIoTStore) RegisterUnknownMachine(hashedPkey string) (*domain.Lega
 }
 
 func (s *LegacyIoTStore) UpdateMachineStatus(hashedPkey, ip, rawAuth, rawDecoded string) {
+	var row machineGeoRow
+	_ = s.db.Get(&row, `SELECT ip_address, COALESCE(geo, '{}'::jsonb) AS geo FROM machines WHERE hashed_pkey = $1`, hashedPkey)
+	oldIP := derefString(row.IP, "")
+	triggerGeo := (oldIP != ip && geo.IsLookupable(ip)) || (machineGeoEmpty(row.Geo) && geo.IsLookupable(ip))
+
 	authJSON, _ := json.Marshal(map[string]string{
 		"raw_auth":    rawAuth,
 		"raw_decoded": rawDecoded,
@@ -70,6 +76,10 @@ func (s *LegacyIoTStore) UpdateMachineStatus(hashedPkey, ip, rawAuth, rawDecoded
 		WHERE hashed_pkey = $1`, hashedPkey, ip, string(authJSON))
 	if err != nil {
 		log.Printf("[legacyiot] update machine status: %v", err)
+		return
+	}
+	if triggerGeo {
+		go s.resolveAndSaveMachineGeo(hashedPkey, ip)
 	}
 }
 
@@ -89,6 +99,26 @@ func (s *LegacyIoTStore) SaveClientData(clientID, version string, ek []domain.Ex
 }
 
 func (s *LegacyIoTStore) SaveGateway(gw *domain.GatewayStatus) error {
+	triggerGeo := false
+	var existing domain.GatewayStatus
+	var existingPayload json.RawMessage
+	err := s.db.Get(&existingPayload, `SELECT payload FROM gateway_push_status WHERE hostname = $1`, gw.Hostname)
+	if err == nil && len(existingPayload) > 0 {
+		_ = json.Unmarshal(existingPayload, &existing)
+		if gw.IP != existing.IP && geo.IsLookupable(gw.IP) {
+			triggerGeo = true
+		} else {
+			gw.GeoLocation = existing.GeoLocation
+			gw.Lat = existing.Lat
+			gw.Lon = existing.Lon
+		}
+		if gw.GeoLocation == "" && (gw.Lat == 0 && gw.Lon == 0) && geo.IsLookupable(gw.IP) {
+			triggerGeo = true
+		}
+	} else if geo.IsLookupable(gw.IP) {
+		triggerGeo = true
+	}
+
 	payload, err := json.Marshal(gw)
 	if err != nil {
 		return err
@@ -99,7 +129,13 @@ func (s *LegacyIoTStore) SaveGateway(gw *domain.GatewayStatus) error {
 		ON CONFLICT (hostname) DO UPDATE SET
 			payload = EXCLUDED.payload,
 			updated_at = NOW()`, gw.Hostname, string(payload))
-	return err
+	if err != nil {
+		return err
+	}
+	if triggerGeo {
+		go s.resolveAndSaveGatewayGeo(gw.Hostname, gw.IP)
+	}
+	return nil
 }
 
 func (s *LegacyIoTStore) ImportMachine(hashedPkey, clientID, ip string, isActive bool, lastSeen time.Time, authDecoded json.RawMessage) error {

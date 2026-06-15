@@ -56,6 +56,7 @@ func main() {
 			log.Printf("WARNING: newsletter tables: %v", err)
 		}
 		log.Println("CONSOLIDATED_MODE=true — identity/admin/legacyiot routes active")
+		go iot.BackfillMissingMachineGeo()
 	}
 
 	nrApp := observability.InitNewRelic()
