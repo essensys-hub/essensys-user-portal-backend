@@ -16,3 +16,8 @@ func IsRemoteEligibleGateway(gatewayID *string) bool {
 	}
 	return NormalizeGatewayHost(*gatewayID) != RemoteIneligibleGatewayHost
 }
+
+// RemoteBlockedMessage is shown in admin UI when linking essensys-server to remote portal.
+func RemoteBlockedMessage() string {
+	return "essensys-server ne supporte pas le portail distant mon.essensys.fr — liaison armoire et serveur cloud interdites"
+}

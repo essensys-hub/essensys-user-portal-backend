@@ -6,22 +6,22 @@ import (
 	"time"
 )
 
-type rateLimiter struct {
+type RateLimiter struct {
 	mu       sync.Mutex
 	counts   map[string][]time.Time
 	limit    int
 	window   time.Duration
 }
 
-func NewRateLimiter(limit int, window time.Duration) *rateLimiter {
-	return &rateLimiter{
+func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
+	return &RateLimiter{
 		counts: make(map[string][]time.Time),
 		limit:  limit,
 		window: window,
 	}
 }
 
-func (rl *rateLimiter) Middleware(next http.Handler) http.Handler {
+func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Header.Get("Authorization")
 		if key == "" {

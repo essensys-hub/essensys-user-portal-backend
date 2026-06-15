@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"context"
@@ -13,17 +13,25 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type Handler struct {
-	store *data.PortalStore
+	store           *data.PortalStore
+	exchangeStaleTTL time.Duration
 }
 
-func NewHandler(store *data.PortalStore) *Handler {
-	return &Handler{store: store}
+func NewHandler(store *data.PortalStore, exchangeStaleTTL time.Duration) *Handler {
+	if exchangeStaleTTL <= 0 {
+		exchangeStaleTTL = 120 * time.Second
+	}
+	return &Handler{store: store, exchangeStaleTTL: exchangeStaleTTL}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	if txn := newrelic.FromContext(r.Context()); txn != nil {
+		txn.Ignore()
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -185,12 +193,58 @@ func (h *Handler) GetExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	keysParam := r.URL.Query().Get("keys")
-	if keysParam == "" {
-		http.Error(w, "Missing keys", http.StatusBadRequest)
+	requested, err := data.ParseKeyList(keysParam)
+	if err != nil {
+		http.Error(w, "Missing or invalid keys", http.StatusBadRequest)
 		return
 	}
-	// État temps réel via mystatus reste sur la gateway — stub vide pour compat UI.
-	writeJSON(w, http.StatusOK, map[string]any{"values": []domain.ExchangeKV{}})
+
+	email := r.Context().Value(middleware.UserEmailKey).(string)
+	user, err := h.store.GetUserByEmail(r.Context(), email)
+	if err != nil || user.LinkedMachineID == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	machineID := *user.LinkedMachineID
+	now := time.Now()
+	stale := true
+	source := "none"
+	var values []domain.ExchangeKV
+
+	if cached, updatedAt, err := h.store.GetGatewayExchange(r.Context(), machineID); err == nil {
+		values = data.FilterExchangeKeys(cached, requested)
+		source = "gateway_cache"
+		stale = now.Sub(updatedAt) > h.exchangeStaleTTL
+		writeJSON(w, http.StatusOK, map[string]any{
+			"values":     values,
+			"stale":      stale,
+			"source":     source,
+			"updated_at": updatedAt.UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// Fallback: machine_telemetry from WAN mystatus (Phase 4 legacy module)
+	clientID := fmt.Sprintf("%d", machineID)
+	if tel, updatedAt, err := h.store.GetMachineTelemetry(r.Context(), clientID); err == nil {
+		values = data.FilterExchangeKeys(tel, requested)
+		source = "mystatus"
+		stale = true
+		writeJSON(w, http.StatusOK, map[string]any{
+			"values":     values,
+			"stale":      stale,
+			"source":     source,
+			"updated_at": updatedAt.UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"values": []domain.ExchangeKV{},
+		"stale":  true,
+		"source": source,
+	})
 }
 
 func (h *Handler) GetHistoryLatest(w http.ResponseWriter, r *http.Request) {

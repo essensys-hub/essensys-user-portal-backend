@@ -15,4 +15,11 @@ func TestIsRemoteEligibleGateway(t *testing.T) {
 	if IsRemoteEligibleGateway(&prefixed) {
 		t.Fatal("gw-essensys-server must not be remote eligible")
 	}
+	empty := ""
+	if IsRemoteEligibleGateway(&empty) {
+		t.Fatal("empty gateway ID must not be remote eligible")
+	}
+	if IsRemoteEligibleGateway(nil) {
+		t.Fatal("nil gateway ID must not be remote eligible")
+	}
 }

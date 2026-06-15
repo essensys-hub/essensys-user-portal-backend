@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
@@ -41,6 +41,31 @@ func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	gatewayID := r.Context().Value(middleware.GatewayIDKey).(string)
 	if err := h.store.TouchGatewayHeartbeat(r.Context(), gatewayID); err != nil {
 		http.Error(w, "Heartbeat failed", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+type pushExchangeBody struct {
+	Keys []domain.ExchangeKV `json:"keys"`
+}
+
+func (h *Handler) PushExchange(w http.ResponseWriter, r *http.Request) {
+	gatewayID := r.Context().Value(middleware.GatewayIDKey).(string)
+	machineID, err := h.store.MachineIDForGateway(r.Context(), gatewayID)
+	if err != nil {
+		http.Error(w, "Unknown gateway", http.StatusUnauthorized)
+		return
+	}
+
+	var body pushExchangeBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Keys) == 0 {
+		http.Error(w, "keys required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.UpsertGatewayExchange(r.Context(), machineID, body.Keys); err != nil {
+		http.Error(w, "Store failed", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
