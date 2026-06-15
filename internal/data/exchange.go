@@ -81,6 +81,27 @@ func FilterExchangeKeys(all []domain.ExchangeKV, requested []int) []domain.Excha
 	return out
 }
 
+// MergeExchangeKeys returns requested keys, preferring primary over secondary.
+func MergeExchangeKeys(primary, secondary []domain.ExchangeKV, requested []int) []domain.ExchangeKV {
+	if len(requested) == 0 {
+		return FilterExchangeKeys(append(append([]domain.ExchangeKV{}, secondary...), primary...), requested)
+	}
+	byKey := make(map[int]string, len(primary)+len(secondary))
+	for _, kv := range secondary {
+		byKey[kv.K] = kv.V
+	}
+	for _, kv := range primary {
+		byKey[kv.K] = kv.V
+	}
+	out := make([]domain.ExchangeKV, 0, len(requested))
+	for _, k := range requested {
+		if v, ok := byKey[k]; ok {
+			out = append(out, domain.ExchangeKV{K: k, V: v})
+		}
+	}
+	return out
+}
+
 func ParseKeyList(keysParam string) ([]int, error) {
 	if keysParam == "" {
 		return nil, fmt.Errorf("empty keys")

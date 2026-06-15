@@ -20,12 +20,20 @@ func NewHandlers(store *data.LegacyIoTStore) *Handlers {
 	return &Handlers{store: store}
 }
 
+// serverInfoIndices matches essensys-server-backend GetServerInfos (mystatus poll list).
+func serverInfoIndices() []int {
+	return []int{613, 607, 615, 590, 349, 350, 351, 352, 363, 425, 426, 920,
+		566, 567, 568, 569, 570, 571, 572,
+		574, 575, 576, 577, 578,
+		582, 583, 584, 585}
+}
+
 func (h *Handlers) ServerInfos(w http.ResponseWriter, r *http.Request) {
 	clientID, _ := r.Context().Value(middleware.LegacyClientIDKey).(string)
 	log.Printf("[legacyiot] ServerInfos by %s", clientID)
 	writeJSON(w, http.StatusOK, domain.ServerInfosResponse{
-		IsConnected: false,
-		Infos:       []int{363, 349, 350, 351, 352, 353, 11, 920},
+		IsConnected: true,
+		Infos:       serverInfoIndices(),
 		NewVersion:  "no",
 	})
 }

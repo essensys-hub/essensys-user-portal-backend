@@ -207,44 +207,57 @@ func (h *Handler) GetExchange(w http.ResponseWriter, r *http.Request) {
 	}
 
 	machineID := *user.LinkedMachineID
-	now := time.Now()
-	stale := true
-	source := "none"
-	var values []domain.ExchangeKV
-
-	if cached, updatedAt, err := h.store.GetGatewayExchange(r.Context(), machineID); err == nil {
-		values = data.FilterExchangeKeys(cached, requested)
-		source = "gateway_cache"
-		stale = now.Sub(updatedAt) > h.exchangeStaleTTL
-		writeJSON(w, http.StatusOK, map[string]any{
-			"values":     values,
-			"stale":      stale,
-			"source":     source,
-			"updated_at": updatedAt.UTC().Format(time.RFC3339),
-		})
-		return
-	}
-
-	// Fallback: machine_telemetry from WAN mystatus (Phase 4 legacy module)
 	clientID := fmt.Sprintf("%d", machineID)
-	if tel, updatedAt, err := h.store.GetMachineTelemetry(r.Context(), clientID); err == nil {
-		values = data.FilterExchangeKeys(tel, requested)
-		source = "mystatus"
-		stale = true
-		writeJSON(w, http.StatusOK, map[string]any{
-			"values":     values,
-			"stale":      stale,
-			"source":     source,
-			"updated_at": updatedAt.UTC().Format(time.RFC3339),
-		})
-		return
+	now := time.Now()
+
+	var cached, tel []domain.ExchangeKV
+	var cacheUpdated, telUpdated time.Time
+	cacheOK := false
+	telOK := false
+
+	if c, updatedAt, err := h.store.GetGatewayExchange(r.Context(), machineID); err == nil {
+		cached = c
+		cacheUpdated = updatedAt
+		cacheOK = true
+	}
+	if t, updatedAt, err := h.store.GetMachineTelemetry(r.Context(), clientID); err == nil {
+		tel = t
+		telUpdated = updatedAt
+		telOK = true
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"values": []domain.ExchangeKV{},
-		"stale":  true,
+	values := data.MergeExchangeKeys(cached, tel, requested)
+
+	source := "none"
+	stale := true
+	var updatedAt time.Time
+	switch {
+	case cacheOK && telOK:
+		source = "gateway_cache+mystatus"
+		updatedAt = cacheUpdated
+		if telUpdated.After(updatedAt) {
+			updatedAt = telUpdated
+		}
+		stale = now.Sub(cacheUpdated) > h.exchangeStaleTTL
+	case cacheOK:
+		source = "gateway_cache"
+		updatedAt = cacheUpdated
+		stale = now.Sub(cacheUpdated) > h.exchangeStaleTTL
+	case telOK:
+		source = "mystatus"
+		updatedAt = telUpdated
+		stale = true
+	}
+
+	resp := map[string]any{
+		"values": values,
+		"stale":  stale,
 		"source": source,
-	})
+	}
+	if !updatedAt.IsZero() {
+		resp["updated_at"] = updatedAt.UTC().Format(time.RFC3339)
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) GetHistoryLatest(w http.ResponseWriter, r *http.Request) {

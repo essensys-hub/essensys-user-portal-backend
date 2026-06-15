@@ -24,6 +24,21 @@ func TestFilterExchangeKeys(t *testing.T) {
 	}
 }
 
+func TestMergeExchangeKeys_prefersPrimary(t *testing.T) {
+	primary := []domain.ExchangeKV{{K: 566, V: "120"}, {K: 605, V: "1"}}
+	secondary := []domain.ExchangeKV{{K: 566, V: "99"}, {K: 567, V: "130"}}
+	merged := MergeExchangeKeys(primary, secondary, []int{566, 567, 605})
+	if len(merged) != 3 {
+		t.Fatalf("expected 3 keys, got %v", merged)
+	}
+	if merged[0].K != 566 || merged[0].V != "120" {
+		t.Fatalf("primary should win for 566: %v", merged)
+	}
+	if merged[1].K != 567 || merged[1].V != "130" {
+		t.Fatalf("missing secondary 567: %v", merged)
+	}
+}
+
 func TestParseKeyListEmpty(t *testing.T) {
 	if _, err := ParseKeyList(""); err == nil {
 		t.Fatal("expected error for empty keys")
