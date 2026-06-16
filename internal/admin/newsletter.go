@@ -6,12 +6,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/notify"
 	"github.com/go-chi/chi/v5"
-	"gopkg.in/gomail.v2"
 )
 
 type subscribeRequest struct {
@@ -176,7 +175,7 @@ func (h *Handlers) SendNewsletter(w http.ResponseWriter, r *http.Request) {
 	subs, _ := h.news.GetSubscribers()
 	successCount, failCount := 0, 0
 	for _, s := range subs {
-		if err := sendEmail([]string{s.Email}, n.Subject, n.Content); err != nil {
+		if err := notify.Send([]string{s.Email}, n.Subject, n.Content); err != nil {
 			log.Printf("[newsletter] send to %s: %v", s.Email, err)
 			failCount++
 		} else {
@@ -197,29 +196,4 @@ func (h *Handlers) SendNewsletter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, n)
-}
-
-func sendEmail(to []string, subject, body string) error {
-	host := os.Getenv("SMTP_HOST")
-	portStr := os.Getenv("SMTP_PORT")
-	user := os.Getenv("SMTP_USER")
-	pass := os.Getenv("SMTP_PASS")
-	if host == "" || portStr == "" || user == "" || pass == "" {
-		return fmt.Errorf("SMTP configuration missing in environment variables")
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("invalid SMTP port: %v", err)
-	}
-	from := os.Getenv("SMTP_FROM")
-	if from == "" {
-		from = user
-	}
-	m := gomail.NewMessage()
-	m.SetHeader("From", from)
-	m.SetHeader("To", to...)
-	m.SetHeader("Subject", subject)
-	m.SetBody("text/html", body)
-	d := gomail.NewDialer(host, port, user, pass)
-	return d.DialAndSend(m)
 }

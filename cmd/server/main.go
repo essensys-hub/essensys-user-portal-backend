@@ -33,6 +33,7 @@ func main() {
 	audit := data.NewAuditStore(db)
 	inventory := data.NewAdminInventoryStore(db)
 	news := data.NewNewsletterStore(db)
+	templates := data.NewEmailTemplateStore(db)
 	iot := data.NewLegacyIoTStore(db)
 	paths, err := sortedSQLMigrations(cfg.MigrationsDir)
 	if err != nil {
@@ -55,12 +56,15 @@ func main() {
 		if err := news.EnsureTablesExist(); err != nil {
 			log.Printf("WARNING: newsletter tables: %v", err)
 		}
+		if err := templates.EnsureTablesExist(); err != nil {
+			log.Printf("WARNING: email template tables: %v", err)
+		}
 		log.Println("CONSOLIDATED_MODE=true — identity/admin/legacyiot routes active")
 		go iot.BackfillMissingMachineGeo()
 	}
 
 	nrApp := observability.InitNewRelic()
-	router := api.NewRouter(store, users, audit, inventory, news, iot, nrApp, cfg)
+	router := api.NewRouter(store, users, audit, inventory, news, templates, iot, nrApp, cfg)
 	log.Printf("essensys-user-portal-backend listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
 		log.Fatal(err)

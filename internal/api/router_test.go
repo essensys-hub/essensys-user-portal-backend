@@ -15,7 +15,7 @@ func TestHealthWithoutNewRelic(t *testing.T) {
 	t.Setenv("NEW_RELIC_ENABLED", "false")
 
 	cfg := config.Config{ExchangeStaleTTL: 120 * time.Second, CORSOrigin: "https://mon.essensys.fr"}
-	handler := NewRouter(nil, nil, nil, nil, nil, nil, nil, cfg)
+	handler := NewRouter(nil, nil, nil, nil, nil, nil, nil, nil, cfg)
 	req := httptest.NewRequest(http.MethodGet, "/api/portal/health", nil)
 	rec := httptest.NewRecorder()
 
@@ -34,7 +34,7 @@ func TestConsolidatedModeScaffold(t *testing.T) {
 		ExchangeStaleTTL: 120 * time.Second,
 		CORSOrigin:       "https://mon.essensys.fr",
 	}
-	handler := NewRouter(nil, nil, nil, nil, nil, nil, nil, cfg)
+	handler := NewRouter(nil, nil, nil, nil, nil, nil, nil, nil, cfg)
 	req := httptest.NewRequest(http.MethodGet, "/api/portal/health", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -47,7 +47,7 @@ func TestGatewayExchangeRouteRegistered(t *testing.T) {
 	t.Setenv("NEW_RELIC_ENABLED", "false")
 
 	cfg := config.Config{ExchangeStaleTTL: 120 * time.Second, CORSOrigin: "https://mon.essensys.fr"}
-	handler := NewRouter(nil, nil, nil, nil, nil, nil, nil, cfg)
+	handler := NewRouter(nil, nil, nil, nil, nil, nil, nil, nil, cfg)
 	req := httptest.NewRequest(http.MethodPost, "/api/gateway/exchange", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -66,7 +66,7 @@ func TestConsolidatedModeAdminLoginRoute(t *testing.T) {
 		ExchangeStaleTTL: 120 * time.Second,
 		CORSOrigin:       "https://mon.essensys.fr",
 	}
-	handler := NewRouter(nil, &data.UserStore{}, nil, nil, nil, nil, nil, cfg)
+	handler := NewRouter(nil, &data.UserStore{}, nil, nil, nil, nil, nil, nil, cfg)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/login", bytes.NewReader([]byte(`{"token":"bad"}`)))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)

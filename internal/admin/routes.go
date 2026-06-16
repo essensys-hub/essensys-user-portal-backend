@@ -32,5 +32,12 @@ func Mount(r chi.Router, d Deps) {
 		r.Post("/admin/users", h.CreateUser)
 		r.Put("/admin/users/{id}/role", h.UpdateUserRole)
 		r.Put("/admin/users/{id}/links", h.UpdateUserLinks)
+		r.Post("/admin/users/{id}/resend-email", h.ResendUserEmail)
+		r.Get("/admin/email/health", h.EmailHealth)
+		r.Get("/admin/email-templates", h.ListEmailTemplates)
+		r.Get("/admin/email-templates/{slug}", h.GetEmailTemplate)
+		r.Put("/admin/email-templates/{slug}", h.PutEmailTemplate)
+		r.Post("/admin/email-templates/{slug}/preview", h.PreviewEmailTemplate)
+		r.Post("/admin/email-templates/test", h.TestEmailTemplate)
 	})
 }

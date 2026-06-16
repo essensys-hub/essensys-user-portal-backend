@@ -20,6 +20,7 @@ type Handlers struct {
 	audit     *data.AuditStore
 	inventory *data.AdminInventoryStore
 	news      *data.NewsletterStore
+	templates *data.EmailTemplateStore
 }
 
 type Deps struct {
@@ -27,6 +28,7 @@ type Deps struct {
 	Audit     *data.AuditStore
 	Inventory *data.AdminInventoryStore
 	News      *data.NewsletterStore
+	Templates *data.EmailTemplateStore
 }
 
 func NewHandlers(d Deps) *Handlers {
@@ -35,6 +37,7 @@ func NewHandlers(d Deps) *Handlers {
 		audit:     d.Audit,
 		inventory: d.Inventory,
 		news:      d.News,
+		templates: d.Templates,
 	}
 }
 
@@ -246,7 +249,12 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.logAudit(adminID, adminEmail, "CREATE_USER", "USER", user.Email, clientIP(r), "Created user by admin")
-	writeJSON(w, http.StatusOK, map[string]string{"message": "User created successfully"})
+	emailResult := h.tryAutoSend(domain.EmailSlugUserWelcome, user, req.Password, adminID, adminEmail, clientIP(r))
+	resp := map[string]any{"message": "User created successfully", "email_sent": emailResult.Sent}
+	if emailResult.Err != nil {
+		resp["email_error"] = emailResult.Err.Error()
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
@@ -281,6 +289,14 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 	if err := h.users.UpdateUserLinks(id, req.MachineID, req.GatewayID, req.ArmoireID); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
+	}
+	adminEmail, _ := r.Context().Value(middleware.UserEmailKey).(string)
+	adminID := 0
+	if u, err := h.users.GetUserByEmail(adminEmail); err == nil && u != nil {
+		adminID = u.ID
+	}
+	if target, err := h.users.GetUserByID(id); err == nil && target != nil {
+		_ = h.tryAutoSend(domain.EmailSlugDeviceAllocation, target, "", adminID, adminEmail, clientIP(r))
 	}
 	w.WriteHeader(http.StatusOK)
 }

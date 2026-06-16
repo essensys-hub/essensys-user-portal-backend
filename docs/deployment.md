@@ -25,6 +25,7 @@ Généré depuis `roles/cloud_backend/templates/cloud-backend.env.j2` :
 - `JWT_SECRET`, `ADMIN_TOKEN`, `ADMIN_EMAILS`
 - OAuth Google / Apple (`GOOGLE_*`, `APPLE_*`)
 - SMTP newsletter (`SMTP_*`)
+- Emails transactionnels admin (mêmes variables `SMTP_*` — bienvenue, allocation appareils, etc.)
 - New Relic APM (`NEW_RELIC_*`)
 
 ### Secrets Ansible (vault)
@@ -42,7 +43,21 @@ Généré depuis `roles/cloud_backend/templates/cloud-backend.env.j2` :
 | `vault_apple_*` | OAuth Apple |
 | `vault_apple_redirect_url` | Callback Apple (optionnel) |
 | `portal_db_name` | Nom base PostgreSQL (défaut template : `essensys_db`) |
-| `vault_smtp_*` | Newsletter |
+| `vault_smtp_*` | Newsletter et emails transactionnels admin |
+
+### Emails transactionnels (admin)
+
+Migration `006_email_templates.sql` crée les tables `email_templates` et `email_send_log`.
+Quatre modèles sont préchargés (`user_welcome`, `device_allocation`, `password_reset`, `role_updated`) — **désactivés par défaut**.
+
+Après déploiement :
+
+1. Vérifier `GET /api/admin/email/health` (SMTP configuré).
+2. Dans l’admin support (`/admin` → onglet **Modèles email**), personnaliser les textes.
+3. Activer `enabled` et `auto_send` sur `user_welcome` une fois le contenu validé.
+
+Les envois automatiques sont déclenchés à la création d’utilisateur et à la mise à jour des liens appareils.
+Un renvoi manuel est disponible depuis la liste utilisateurs (**Renvoyer email**).
 
 Modèle local : `essensys-ansible/config/.env.example`  
 Mot de passe vault : `essensys-ansible/config/.env` → `ANSIBLE_VAULT_PASSWORD`

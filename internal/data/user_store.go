@@ -70,6 +70,18 @@ func (s *UserStore) GetUserByEmail(email string) (*domain.User, error) {
 	return &user, nil
 }
 
+func (s *UserStore) GetUserByID(id int) (*domain.User, error) {
+	var user domain.User
+	err := s.db.Get(&user, `SELECT * FROM users WHERE id = $1`, id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (s *UserStore) UpdateLastLogin(userID int) error {
 	_, err := s.db.Exec(`UPDATE users SET last_login = $1 WHERE id = $2`, time.Now(), userID)
 	return err

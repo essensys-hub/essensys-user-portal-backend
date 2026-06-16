@@ -18,7 +18,7 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
-func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, iot *data.LegacyIoTStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
+func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
 	h := handlers.NewHandler(store, cfg.ExchangeStaleTTL)
 	r := chi.NewRouter()
 	r.Use(chimw.RealIP)
@@ -49,6 +49,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 				Audit:     audit,
 				Inventory: inventory,
 				News:      news,
+				Templates: templates,
 			})
 			legacyiot.Mount(r, iot, store)
 		}
