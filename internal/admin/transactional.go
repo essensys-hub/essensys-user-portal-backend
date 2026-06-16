@@ -25,10 +25,10 @@ func (h *Handlers) tryAutoSend(slug string, user *domain.User, tempPassword stri
 	if err != nil || !tpl.Enabled || !tpl.AutoSend {
 		return sendResult{}
 	}
-	return h.sendTemplateEmail(slug, user, tempPassword, adminID, adminEmail, ip)
+	return h.sendTemplateEmail(slug, user, tempPassword, adminID, adminEmail, ip, true)
 }
 
-func (h *Handlers) sendTemplateEmail(slug string, user *domain.User, tempPassword string, adminID int, adminEmail, ip string) sendResult {
+func (h *Handlers) sendTemplateEmail(slug string, user *domain.User, tempPassword string, adminID int, adminEmail, ip string, requireEnabled bool) sendResult {
 	if h.templates == nil || user == nil {
 		return sendResult{Err: fmt.Errorf("email service unavailable")}
 	}
@@ -36,7 +36,7 @@ func (h *Handlers) sendTemplateEmail(slug string, user *domain.User, tempPasswor
 	if err != nil {
 		return sendResult{Err: err}
 	}
-	if !tpl.Enabled {
+	if requireEnabled && !tpl.Enabled {
 		return sendResult{Err: fmt.Errorf("template %s is disabled", slug)}
 	}
 	if !notify.Configured() {

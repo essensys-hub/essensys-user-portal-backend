@@ -158,7 +158,7 @@ func (h *Handlers) ResendUserEmail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "template_slug required", http.StatusBadRequest)
 		return
 	}
-	result := h.sendTemplateEmail(req.TemplateSlug, user, req.Password, admin.ID, admin.Email, clientIP(r))
+	result := h.sendTemplateEmail(req.TemplateSlug, user, req.Password, admin.ID, admin.Email, clientIP(r), false)
 	if result.Err != nil {
 		http.Error(w, result.Err.Error(), http.StatusInternalServerError)
 		return
