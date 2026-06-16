@@ -87,16 +87,13 @@ func (s *EmailTemplateStore) Upsert(t *domain.EmailTemplate) error {
 }
 
 func (s *EmailTemplateStore) LogSend(recipient, slug, status, errMsg string, adminID *int) error {
+	var errVal interface{}
+	if errMsg != "" {
+		errVal = errMsg
+	}
 	_, err := s.db.Exec(`
 		INSERT INTO email_send_log (recipient, template_slug, status, error_message, admin_id, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)`,
-		recipient, slug, status, nullIfEmpty(errMsg), adminID, time.Now())
+		recipient, slug, status, errVal, adminID, time.Now())
 	return err
-}
-
-func nullIfEmpty(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
 }
