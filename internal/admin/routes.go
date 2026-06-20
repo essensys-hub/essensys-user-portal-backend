@@ -39,5 +39,12 @@ func Mount(r chi.Router, d Deps) {
 		r.Put("/admin/email-templates/{slug}", h.PutEmailTemplate)
 		r.Post("/admin/email-templates/{slug}/preview", h.PreviewEmailTemplate)
 		r.Post("/admin/email-templates/test", h.TestEmailTemplate)
+		r.Get("/admin/sync-profiles", h.ListSyncProfiles)
+		r.Post("/admin/sync-profiles", h.CreateSyncProfile)
+		r.Put("/admin/sync-profiles/{id}", h.UpdateSyncProfile)
+		r.Delete("/admin/sync-profiles/{id}", h.DeleteSyncProfile)
+		r.Post("/admin/sync-profiles/{id}/run", h.RunSyncProfile)
+		r.Get("/admin/sync-profiles/{id}/runs", h.ListSyncProfileRuns)
+		r.Get("/admin/sync-runs/{runId}", h.GetSyncRun)
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -284,19 +285,33 @@ func (h *Handler) InjectBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	guid := newGUID()
 	params := make([]domain.ExchangeKV, 0, len(body.Params))
 	for _, p := range body.Params {
 		params = append(params, domain.ExchangeKV{K: p.K, V: p.V})
 	}
 	params = domain.ExpandLegacyScenarioBlock(params)
 
-	if err := h.store.EnqueueCloudAction(r.Context(), guid, user.ID, user.LinkedMachineID, params); err != nil {
-		http.Error(w, "Enqueue failed", http.StatusInternalServerError)
-		return
+	chunks := domain.ChunkExchangeParams(params, domain.MaxFirmwareParamsPerAction)
+	guids := make([]string, 0, len(chunks))
+	for _, chunk := range chunks {
+		chunkGUID := newGUID()
+		if err := h.store.EnqueueCloudAction(r.Context(), chunkGUID, user.ID, user.LinkedMachineID, chunk); err != nil {
+			http.Error(w, "Enqueue failed", http.StatusInternalServerError)
+			return
+		}
+		guids = append(guids, chunkGUID)
 	}
-	_ = h.store.AuditLog(r.Context(), email, "portal_inject_batch", map[string]any{"guid": guid, "count": len(params)})
-	writeJSON(w, http.StatusOK, map[string]any{"guid": guid, "params": params, "count": len(params)})
+	if err := h.store.UpsertGatewayExchange(r.Context(), *user.LinkedMachineID, params); err != nil {
+		log.Printf("[portal] inject batch cache update: %v", err)
+	}
+	_ = h.store.AuditLog(r.Context(), email, "portal_inject_batch", map[string]any{"guids": guids, "count": len(params), "chunks": len(chunks)})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"guid":   guids[0],
+		"guids":  guids,
+		"params": params,
+		"count":  len(params),
+		"chunks": len(chunks),
+	})
 }
 
 func (h *Handler) ListPendingLinkRequests(w http.ResponseWriter, r *http.Request) {

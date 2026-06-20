@@ -25,6 +25,13 @@ func Mount(r chi.Router, h *handlers.Handler, injectLimiter *middleware.RateLimi
 		r.Get("/history/latest", h.GetHistoryLatest)
 		r.Post("/web/actions", h.PostWebActions)
 
+		r.Get("/scenarios", h.ListScenarios)
+		r.Get("/scenarios/meta/bitmasks", h.GetScenarioBitmasks)
+		r.Get("/scenarios/{slot}", h.GetScenario)
+		r.Put("/scenarios/{slot}", h.PutScenario)
+		r.With(injectLimiter.Middleware).Post("/scenarios/{slot}/launch", h.LaunchScenario)
+		r.With(injectLimiter.Middleware).Post("/scenarios/{slot}/restore", h.RestoreScenario)
+
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(middleware.AdminJWT)
 			r.Get("/link-requests", h.ListPendingLinkRequests)

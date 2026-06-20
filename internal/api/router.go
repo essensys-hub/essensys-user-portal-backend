@@ -27,7 +27,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{cfg.CORSOrigin},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Gateway-ID", "X-Gateway-Eth0-MAC", "X-Gateway-Eth1-MAC"},
 		AllowCredentials: true,
 	}))
@@ -50,6 +50,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 				Inventory: inventory,
 				News:      news,
 				Templates: templates,
+				Portal:    store,
 			})
 			legacyiot.Mount(r, iot, store)
 		}
