@@ -16,7 +16,22 @@ type ExchangeCache struct {
 }
 
 func (s *PortalStore) UpsertGatewayExchange(ctx context.Context, machineID int, keys []domain.ExchangeKV) error {
-	raw, err := json.Marshal(keys)
+	merged := keys
+	if existing, _, err := s.GetGatewayExchange(ctx, machineID); err == nil && len(existing) > 0 {
+		want := make(map[int]struct{}, len(keys)+len(existing))
+		for _, kv := range keys {
+			want[kv.K] = struct{}{}
+		}
+		for _, kv := range existing {
+			want[kv.K] = struct{}{}
+		}
+		requested := make([]int, 0, len(want))
+		for k := range want {
+			requested = append(requested, k)
+		}
+		merged = MergeExchangeKeys(keys, existing, requested)
+	}
+	raw, err := json.Marshal(merged)
 	if err != nil {
 		return err
 	}
