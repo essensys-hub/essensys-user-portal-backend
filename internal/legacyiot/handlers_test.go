@@ -27,4 +27,7 @@ func TestServerInfos(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
+	if len(serverInfoIndices()) > 30 {
+		t.Fatalf("serverinfos must have ≤30 indices for firmware, got %d", len(serverInfoIndices()))
+	}
 }

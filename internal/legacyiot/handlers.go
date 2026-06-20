@@ -24,10 +24,15 @@ func NewHandlers(store *data.LegacyIoTStore, portal *data.PortalStore) *Handlers
 
 // serverInfoIndices matches essensys-server-backend GetServerInfos (mystatus poll list).
 func serverInfoIndices() []int {
-	return []int{613, 607, 615, 590, 349, 350, 351, 352, 363, 425, 426, 920,
+	indices := []int{613, 607, 615, 590, 349, 350, 351, 352, 363, 425, 426, 920,
 		566, 567, 568, 569, 570, 571, 572,
 		574, 575, 576, 577, 578,
 		582, 583, 584, 585}
+	// Planning chauffage (13–348) : NE PAS lister ici. Le firmware BP_MQX_ETH (099-37)
+	// accepte au maximum 30 indices dans serverinfos (Json.c → ERREUR_INFOS_NB_VALEURS_MAX).
+	// Au-delà, le cycle Ethernet s'arrête après GET serverinfos : pas de mystatus ni myactions.
+	// Écriture planning : POST /api/portal/inject/batch (≤30 params/action). Lecture UI : exchange.
+	return indices
 }
 
 func (h *Handlers) ServerInfos(w http.ResponseWriter, r *http.Request) {
