@@ -20,6 +20,7 @@ func Mount(r chi.Router, h *handlers.Handler, injectLimiter *middleware.RateLimi
 		r.Get("/session", h.PortalSession)
 		r.Get("/gateway/status", h.GatewayStatus)
 		r.With(injectLimiter.Middleware).Post("/inject", h.Inject)
+		r.With(injectLimiter.Middleware).Post("/inject/batch", h.InjectBatch)
 		r.Get("/exchange", h.GetExchange)
 		r.Get("/history/latest", h.GetHistoryLatest)
 		r.Post("/web/actions", h.PostWebActions)

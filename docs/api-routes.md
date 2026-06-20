@@ -12,6 +12,7 @@ Base URL prod : `https://mon.essensys.fr/api`
 | GET | `/portal/session` | JWT user — profil, gateway et armoire liés |
 | GET | `/portal/gateway/status` | JWT user |
 | POST | `/portal/inject` | JWT user |
+| POST | `/portal/inject/batch` | JWT user — plusieurs k/v en une action cloud (planning chauffage) |
 | GET | `/portal/exchange` | JWT user |
 | GET | `/portal/history/latest` | JWT user |
 | POST | `/portal/web/actions` | JWT user |

@@ -252,6 +252,53 @@ func (h *Handler) Inject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"guid": guid, "params": params})
 }
 
+type injectBatchBody struct {
+	Params []injectBody `json:"params"`
+}
+
+func (h *Handler) InjectBatch(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(middleware.UserEmailKey).(string)
+	user, err := h.store.GetUserByEmail(r.Context(), email)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	approved, _ := h.store.UserHasApprovedLink(r.Context(), user.ID)
+	if !approved || user.LinkedMachineID == nil {
+		http.Error(w, "Portal access not approved", http.StatusForbidden)
+		return
+	}
+	if !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+		http.Error(w, "Gateway not eligible for remote portal", http.StatusForbidden)
+		return
+	}
+
+	var body injectBatchBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Params) == 0 {
+		http.Error(w, "params required", http.StatusBadRequest)
+		return
+	}
+	if len(body.Params) > 96 {
+		http.Error(w, "too many params (max 96)", http.StatusBadRequest)
+		return
+	}
+
+	guid := newGUID()
+	params := make([]domain.ExchangeKV, 0, len(body.Params))
+	for _, p := range body.Params {
+		params = append(params, domain.ExchangeKV{K: p.K, V: p.V})
+	}
+	params = domain.ExpandLegacyScenarioBlock(params)
+
+	if err := h.store.EnqueueCloudAction(r.Context(), guid, user.ID, user.LinkedMachineID, params); err != nil {
+		http.Error(w, "Enqueue failed", http.StatusInternalServerError)
+		return
+	}
+	_ = h.store.AuditLog(r.Context(), email, "portal_inject_batch", map[string]any{"guid": guid, "count": len(params)})
+	writeJSON(w, http.StatusOK, map[string]any{"guid": guid, "params": params, "count": len(params)})
+}
+
 func (h *Handler) ListPendingLinkRequests(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.store.ListLinkRequestsByStatus(r.Context(), domain.LinkStatusPending)
 	if err != nil {
