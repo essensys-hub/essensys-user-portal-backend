@@ -9,9 +9,12 @@ Base URL prod : `https://mon.essensys.fr/api`
 | GET | `/portal/health` | — |
 | POST | `/portal/link-request` | JWT user |
 | GET | `/portal/link-request/status` | JWT user |
+| GET | `/portal/session` | JWT user — profil, gateway et armoire liés |
+| GET | `/portal/gateway/status` | JWT user |
 | POST | `/portal/inject` | JWT user |
 | GET | `/portal/exchange` | JWT user |
-| GET | `/portal/last-action` | JWT user |
+| GET | `/portal/history/latest` | JWT user |
+| POST | `/portal/web/actions` | JWT user |
 | POST | `/portal/admin/link-requests/{id}/approve` | JWT admin |
 | POST | `/portal/admin/gateways/register` | JWT admin |
 

@@ -35,8 +35,11 @@ type UserProfile struct {
 	ID              int     `db:"id" json:"id"`
 	Email           string  `db:"email" json:"email"`
 	Role            string  `db:"role" json:"role"`
+	FirstName       string  `db:"first_name" json:"first_name"`
+	LastName        string  `db:"last_name" json:"last_name"`
 	LinkedMachineID *int    `db:"linked_machine_id" json:"linked_machine_id"`
 	LinkedGatewayID *string `db:"linked_gateway_id" json:"linked_gateway_id"`
+	LinkedArmoireID *int    `db:"linked_armoire_id" json:"linked_armoire_id"`
 }
 
 const (

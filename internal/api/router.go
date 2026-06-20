@@ -19,7 +19,7 @@ import (
 )
 
 func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
-	h := handlers.NewHandler(store, cfg.ExchangeStaleTTL)
+	h := handlers.NewHandler(store, inventory, cfg.ExchangeStaleTTL)
 	r := chi.NewRouter()
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Logger)

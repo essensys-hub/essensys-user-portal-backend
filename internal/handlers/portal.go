@@ -17,15 +17,16 @@ import (
 )
 
 type Handler struct {
-	store           *data.PortalStore
+	store            *data.PortalStore
+	inventory        *data.AdminInventoryStore
 	exchangeStaleTTL time.Duration
 }
 
-func NewHandler(store *data.PortalStore, exchangeStaleTTL time.Duration) *Handler {
+func NewHandler(store *data.PortalStore, inventory *data.AdminInventoryStore, exchangeStaleTTL time.Duration) *Handler {
 	if exchangeStaleTTL <= 0 {
 		exchangeStaleTTL = 120 * time.Second
 	}
-	return &Handler{store: store, exchangeStaleTTL: exchangeStaleTTL}
+	return &Handler{store: store, inventory: inventory, exchangeStaleTTL: exchangeStaleTTL}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -83,6 +84,7 @@ func (h *Handler) LinkRequestStatus(w http.ResponseWriter, r *http.Request) {
 			"status":              "none",
 			"linked_machine_id":   user.LinkedMachineID,
 			"linked_gateway_id":   user.LinkedGatewayID,
+			"linked_armoire_id":   user.LinkedArmoireID,
 			"portal_access":       portalAccess,
 		})
 		return
@@ -91,6 +93,7 @@ func (h *Handler) LinkRequestStatus(w http.ResponseWriter, r *http.Request) {
 		"link_request":        lr,
 		"linked_machine_id":   user.LinkedMachineID,
 		"linked_gateway_id":   user.LinkedGatewayID,
+		"linked_armoire_id":   user.LinkedArmoireID,
 		"portal_access":       portalAccess,
 	})
 }
@@ -104,6 +107,105 @@ func (h *Handler) GatewayStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	online, _ := h.store.IsGatewayOnline(r.Context(), *user.LinkedGatewayID, 2*time.Minute)
 	writeJSON(w, http.StatusOK, map[string]bool{"online": online})
+}
+
+func (h *Handler) PortalSession(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(middleware.UserEmailKey).(string)
+	user, err := h.store.GetUserByEmail(r.Context(), email)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	portalAccess := h.userPortalAccess(r.Context(), user)
+	resp := domain.PortalSessionResponse{
+		User: domain.PortalUserInfo{
+			ID:              user.ID,
+			Email:           user.Email,
+			FirstName:       user.FirstName,
+			LastName:        user.LastName,
+			Role:            user.Role,
+			LinkedMachineID: user.LinkedMachineID,
+			LinkedGatewayID: user.LinkedGatewayID,
+			LinkedArmoireID: user.LinkedArmoireID,
+		},
+		PortalAccess: portalAccess,
+	}
+
+	if h.inventory != nil && user.LinkedGatewayID != nil && domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+		online, _ := h.store.IsGatewayOnline(r.Context(), *user.LinkedGatewayID, 2*time.Minute)
+		gw := h.resolveGateway(*user.LinkedGatewayID)
+		if gw != nil {
+			resp.Gateway = &domain.PortalGatewayInfo{
+				ID:       *user.LinkedGatewayID,
+				Hostname: gw.Hostname,
+				IP:       gw.IP,
+				Online:   online,
+				LastSeen: gw.LastSeen,
+			}
+		} else {
+			resp.Gateway = &domain.PortalGatewayInfo{
+				ID:     *user.LinkedGatewayID,
+				Online: online,
+			}
+		}
+	}
+
+	if h.inventory != nil && portalAccess {
+		if arm := h.resolveArmoire(user.LinkedArmoireID, user.LinkedMachineID); arm != nil {
+			resp.Armoire = &domain.PortalArmoireInfo{
+				ID:          arm.ID,
+				NoSerie:     arm.NoSerie,
+				IP:          arm.IP,
+				LastSeen:    arm.LastSeen,
+				GeoLocation: arm.GeoLocation,
+				Remote:      true,
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) resolveGateway(gatewayID string) *domain.GatewayStatus {
+	if h.inventory == nil {
+		return nil
+	}
+	gateways, err := h.inventory.GetGateways()
+	if err != nil {
+		return nil
+	}
+	for _, g := range gateways {
+		if g.Hostname == gatewayID {
+			return g
+		}
+	}
+	return nil
+}
+
+func (h *Handler) resolveArmoire(armoireID, machineID *int) *domain.MachineDetail {
+	if h.inventory == nil {
+		return nil
+	}
+	machines, err := h.inventory.GetMachines()
+	if err != nil {
+		return nil
+	}
+	if armoireID != nil {
+		for _, m := range machines {
+			if m.ID == *armoireID {
+				return m
+			}
+		}
+	}
+	if machineID != nil {
+		for _, m := range machines {
+			if m.ID == *machineID {
+				return m
+			}
+		}
+	}
+	return nil
 }
 
 type injectBody struct {

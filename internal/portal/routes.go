@@ -17,6 +17,7 @@ func Mount(r chi.Router, h *handlers.Handler, injectLimiter *middleware.RateLimi
 			r.Use(middleware.UserJWT)
 		r.Post("/link-request", h.CreateLinkRequest)
 		r.Get("/link-request/status", h.LinkRequestStatus)
+		r.Get("/session", h.PortalSession)
 		r.Get("/gateway/status", h.GatewayStatus)
 		r.With(injectLimiter.Middleware).Post("/inject", h.Inject)
 		r.Get("/exchange", h.GetExchange)

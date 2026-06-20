@@ -42,7 +42,8 @@ func hashToken(token string) string {
 func (s *PortalStore) GetUserByEmail(ctx context.Context, email string) (*domain.UserProfile, error) {
 	var u domain.UserProfile
 	err := s.db.GetContext(ctx, &u, `
-		SELECT id, email, role, linked_machine_id, linked_gateway_id
+		SELECT id, email, role, first_name, last_name,
+		       linked_machine_id, linked_gateway_id, linked_armoire_id
 		FROM users WHERE email = $1`, email)
 	if err != nil {
 		return nil, err
