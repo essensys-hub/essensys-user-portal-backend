@@ -11,6 +11,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain/scenario"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/testmode"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -99,7 +100,16 @@ func (h *Handler) PutScenario(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
+		if testmode.IsDryRun(r) {
+			testmode.WriteFailed(w, err.Error())
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if testmode.IsDryRun(r) {
+		testmode.WriteOK(w, flattenChunks(chunks), nil, "")
 		return
 	}
 
@@ -135,7 +145,15 @@ func (h *Handler) LaunchScenario(w http.ResponseWriter, r *http.Request) {
 	}
 	params, err := scenario.LaunchParams(slot)
 	if err != nil {
+		if testmode.IsDryRun(r) {
+			testmode.WriteFailed(w, err.Error())
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if testmode.IsDryRun(r) {
+		testmode.WriteOK(w, params, nil, "")
 		return
 	}
 	guid := newGUID()
@@ -164,7 +182,15 @@ func (h *Handler) RestoreScenario(w http.ResponseWriter, r *http.Request) {
 	}
 	params, err := scenario.RestorePresetParams(slot)
 	if err != nil {
+		if testmode.IsDryRun(r) {
+			testmode.WriteFailed(w, err.Error())
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if testmode.IsDryRun(r) {
+		testmode.WriteOK(w, params, nil, "")
 		return
 	}
 	guid := newGUID()

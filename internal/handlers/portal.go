@@ -13,6 +13,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/testmode"
 	"github.com/go-chi/chi/v5"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -245,6 +246,15 @@ func (h *Handler) Inject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := domain.ExpandLegacyScenarioBlock([]domain.ExchangeKV{{K: body.K, V: body.V}})
+	if testmode.IsDryRun(r) {
+		chunks := domain.ChunkExchangeParams(params, domain.MaxFirmwareParamsPerAction)
+		if len(chunks) == 0 {
+			testmode.WriteFailed(w, "no params")
+			return
+		}
+		testmode.WriteOK(w, params, nil, "")
+		return
+	}
 	if err := h.store.EnqueueCloudAction(r.Context(), guid, user.ID, user.LinkedMachineID, params); err != nil {
 		http.Error(w, "Enqueue failed", http.StatusInternalServerError)
 		return
@@ -292,6 +302,15 @@ func (h *Handler) InjectBatch(w http.ResponseWriter, r *http.Request) {
 	params = domain.ExpandLegacyScenarioBlock(params)
 
 	chunks := domain.ChunkExchangeParams(params, domain.MaxFirmwareParamsPerAction)
+	if testmode.IsDryRun(r) {
+		if len(chunks) == 0 {
+			testmode.WriteFailed(w, "no params")
+			return
+		}
+		testmode.WriteOK(w, params, nil, "")
+		return
+	}
+
 	guids := make([]string, 0, len(chunks))
 	for _, chunk := range chunks {
 		chunkGUID := newGUID()
@@ -484,6 +503,10 @@ func (h *Handler) PostWebActions(w http.ResponseWriter, r *http.Request) {
 		{K: 410, V: req.CodeAlarme[0:2]},
 		{K: 411, V: req.CodeAlarme[2:4]},
 		{K: 307, V: "0"},
+	}
+	if testmode.IsDryRun(r) {
+		testmode.WriteOK(w, params, nil, "")
+		return
 	}
 	guid := newGUID()
 	if err := h.store.EnqueueCloudAction(r.Context(), guid, user.ID, user.LinkedMachineID, params); err != nil {
