@@ -16,12 +16,11 @@ const UserEmailKey contextKey = "user_email"
 const UserRoleKey contextKey = "user_role"
 const GatewayIDKey contextKey = "gateway_id"
 
+// jwtKey returns the HMAC signing key. JWT_SECRET is validated at startup
+// (config.Validate), so it is guaranteed present and strong here; no insecure
+// fallback is provided on purpose.
 func jwtKey() []byte {
-	key := os.Getenv("JWT_SECRET")
-	if key == "" {
-		key = "default-insecure-jwt-secret-change-me"
-	}
-	return []byte(key)
+	return []byte(os.Getenv("JWT_SECRET"))
 }
 
 func UserJWT(next http.Handler) http.Handler {

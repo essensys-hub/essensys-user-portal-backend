@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"crypto/subtle"
 	"log"
 	"net/http"
 	"os"
@@ -15,11 +16,10 @@ func AdminAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 
+		// ADMIN_TOKEN is validated at startup (config.Validate); never accept a
+		// missing/empty expected token, and compare in constant time.
 		expectedToken := os.Getenv("ADMIN_TOKEN")
-		if expectedToken == "" {
-			expectedToken = "essensys-admin-secret"
-		}
-		if tokenStr == expectedToken {
+		if expectedToken != "" && subtle.ConstantTimeCompare([]byte(tokenStr), []byte(expectedToken)) == 1 {
 			next.ServeHTTP(w, r)
 			return
 		}

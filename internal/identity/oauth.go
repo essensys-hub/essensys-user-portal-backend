@@ -135,7 +135,10 @@ func (h *Handlers) GoogleCallback(w http.ResponseWriter, req *http.Request) {
 	if frontendURL == "" {
 		frontendURL = "/"
 	}
-	http.Redirect(w, req, frontendURL+"admin?token="+tokenString+"&role="+role, http.StatusTemporaryRedirect)
+	// Deliver the session token in the URL fragment (not the query string):
+	// fragments are not sent to the server, not written to access logs, and not
+	// leaked via the Referer header. The SPA reads it from location.hash.
+	http.Redirect(w, req, frontendURL+"admin#token="+tokenString+"&role="+role, http.StatusTemporaryRedirect)
 }
 
 func getUserDataFromGoogle(code string) ([]byte, error) {
@@ -321,5 +324,8 @@ func (h *Handlers) AppleCallback(w http.ResponseWriter, req *http.Request) {
 	if frontendURL == "" {
 		frontendURL = "/"
 	}
-	http.Redirect(w, req, frontendURL+"admin?token="+tokenString+"&role="+role, http.StatusSeeOther)
+	// Deliver the session token in the URL fragment (not the query string):
+	// fragments are not sent to the server, not written to access logs, and not
+	// leaked via the Referer header. The SPA reads it from location.hash.
+	http.Redirect(w, req, frontendURL+"admin#token="+tokenString+"&role="+role, http.StatusSeeOther)
 }

@@ -1,11 +1,27 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// minSecretLen is the minimum accepted length for security-critical secrets.
+const minSecretLen = 16
+
+// insecureSecrets are well-known placeholder values that must never reach
+// production. They are rejected at startup by Validate.
+var insecureSecrets = map[string]bool{
+	"":                                      true,
+	"insecure-dev-secret":                   true,
+	"default-insecure-jwt-secret-change-me": true,
+	"essensys-admin-secret":                 true,
+	"changeme_random_secret":                true,
+	"changeme":                              true,
+	"1234567890":                            true,
+}
 
 // Load reads runtime configuration from environment variables.
 func Load() Config {
@@ -20,8 +36,32 @@ func Load() Config {
 		Port:              env("PORT", "8081"),
 		MigrationsDir:     env("MIGRATIONS_DIR", "migrations"),
 		CORSOrigin:        env("CORS_ORIGIN", "https://mon.essensys.fr"),
-		JWTSecret:         env("JWT_SECRET", "insecure-dev-secret"),
+		JWTSecret:         env("JWT_SECRET", ""),
+		AdminToken:        env("ADMIN_TOKEN", ""),
 	}
+}
+
+// Validate fails closed: it returns an error when a security-critical secret is
+// missing, too short, or set to a known-insecure placeholder. Callers must abort
+// startup on error so the service never runs with guessable credentials.
+func (c Config) Validate() error {
+	if err := checkSecret("JWT_SECRET", c.JWTSecret); err != nil {
+		return err
+	}
+	if err := checkSecret("ADMIN_TOKEN", c.AdminToken); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkSecret(name, value string) error {
+	if insecureSecrets[value] {
+		return fmt.Errorf("%s is missing or set to a known-insecure default; set a strong unique value", name)
+	}
+	if len(value) < minSecretLen {
+		return fmt.Errorf("%s is too short (%d chars); require at least %d", name, len(value), minSecretLen)
+	}
+	return nil
 }
 
 type Config struct {
@@ -36,6 +76,7 @@ type Config struct {
 	MigrationsDir    string
 	CORSOrigin       string
 	JWTSecret        string
+	AdminToken       string
 }
 
 func env(key, fallback string) string {
