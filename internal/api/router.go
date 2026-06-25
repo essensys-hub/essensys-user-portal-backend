@@ -39,7 +39,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 	}
 
 	r.Route("/api", func(r chi.Router) {
-		portal.Mount(r, h, injectLimiter)
+		portal.Mount(r, h, users, injectLimiter)
 		gw.Mount(r, h, store)
 
 		if cfg.ConsolidatedMode {

@@ -37,6 +37,7 @@ func (s *UserStore) EnsureTableExists() error {
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS linked_machine_id INT;
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS linked_gateway_id VARCHAR(255);
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS linked_armoire_id INT;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS forbidden_at TIMESTAMPTZ NULL;
 	`
 	_, err := s.db.Exec(query)
 	return err
@@ -102,6 +103,22 @@ func (s *UserStore) DeleteUser(userID int) error {
 	return err
 }
 
+func (s *UserStore) ForbidUser(userID int) error {
+	_, err := s.db.Exec(`UPDATE users SET forbidden_at = $1 WHERE id = $2`, time.Now(), userID)
+	return err
+}
+
+func (s *UserStore) UnforbidUser(userID int) error {
+	_, err := s.db.Exec(`UPDATE users SET forbidden_at = NULL WHERE id = $1`, userID)
+	return err
+}
+
+func (s *UserStore) CountAdminGlobal() (int, error) {
+	var count int
+	err := s.db.Get(&count, `SELECT count(*) FROM users WHERE role = $1`, domain.RoleAdminGlobal)
+	return count, err
+}
+
 func (s *UserStore) UpdateUserLinks(userID int, machineID *int, gatewayID *string, armoireID *int) error {
 	_, err := s.db.Exec(`UPDATE users SET linked_machine_id = $1, linked_gateway_id = $2, linked_armoire_id = $3 WHERE id = $4`,
 		machineID, gatewayID, armoireID, userID)
@@ -111,7 +128,7 @@ func (s *UserStore) UpdateUserLinks(userID int, machineID *int, gatewayID *strin
 func (s *UserStore) GetAllUsers() ([]*domain.User, error) {
 	var users []*domain.User
 	err := s.db.Select(&users, `
-		SELECT id, email, role, first_name, last_name, provider, created_at, last_login,
+		SELECT id, email, role, first_name, last_name, provider, created_at, last_login, forbidden_at,
 		       linked_machine_id, linked_gateway_id, linked_armoire_id
 		FROM users ORDER BY created_at DESC`)
 	if users == nil {
@@ -123,7 +140,7 @@ func (s *UserStore) GetAllUsers() ([]*domain.User, error) {
 func (s *UserStore) GetUsersByMachineID(machineID int) ([]*domain.User, error) {
 	var users []*domain.User
 	err := s.db.Select(&users, `
-		SELECT id, email, role, first_name, last_name, provider, created_at, last_login,
+		SELECT id, email, role, first_name, last_name, provider, created_at, last_login, forbidden_at,
 		       linked_machine_id, linked_gateway_id, linked_armoire_id
 		FROM users WHERE linked_machine_id = $1 ORDER BY created_at DESC`, machineID)
 	if users == nil {

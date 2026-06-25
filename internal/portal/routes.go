@@ -3,18 +3,19 @@ package portal
 import (
 	"time"
 
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/handlers"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/go-chi/chi/v5"
 )
 
 // Mount registers user portal routes (/api/portal/*).
-func Mount(r chi.Router, h *handlers.Handler, injectLimiter *middleware.RateLimiter) {
+func Mount(r chi.Router, h *handlers.Handler, users *data.UserStore, injectLimiter *middleware.RateLimiter) {
 	r.Route("/portal", func(r chi.Router) {
 		r.Get("/health", h.Health)
 
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.UserJWT)
+			r.Use(middleware.UserJWTWithStore(users))
 		r.Post("/link-request", h.CreateLinkRequest)
 		r.Get("/link-request/status", h.LinkRequestStatus)
 		r.Get("/session", h.PortalSession)
@@ -33,7 +34,7 @@ func Mount(r chi.Router, h *handlers.Handler, injectLimiter *middleware.RateLimi
 		r.With(injectLimiter.Middleware).Post("/scenarios/{slot}/restore", h.RestoreScenario)
 
 		r.Route("/admin", func(r chi.Router) {
-			r.Use(middleware.AdminJWT)
+			r.Use(middleware.AdminJWTWithStore(users))
 			r.Get("/link-requests", h.ListPendingLinkRequests)
 			r.Put("/link-requests/{id}", h.ReviewLinkRequest)
 			r.Get("/gateway-sessions", h.ListGatewaySessions)

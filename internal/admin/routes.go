@@ -15,7 +15,7 @@ func Mount(r chi.Router, d Deps) {
 	r.Post("/admin/login", h.Login)
 
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.AdminAuth)
+		r.Use(middleware.AdminAuthWithStore(d.Users))
 		r.Get("/admin/stats", h.Stats)
 		r.Get("/admin/audit", h.AuditLogs)
 		r.Get("/admin/machines", h.Machines)
@@ -32,6 +32,9 @@ func Mount(r chi.Router, d Deps) {
 		r.Post("/admin/users", h.CreateUser)
 		r.Put("/admin/users/{id}/role", h.UpdateUserRole)
 		r.Put("/admin/users/{id}/links", h.UpdateUserLinks)
+		r.Post("/admin/users/{id}/forbid", h.ForbidUser)
+		r.Post("/admin/users/{id}/unforbid", h.UnforbidUser)
+		r.Delete("/admin/users/{id}", h.DeleteUser)
 		r.Post("/admin/users/{id}/resend-email", h.ResendUserEmail)
 		r.Get("/admin/email/health", h.EmailHealth)
 		r.Get("/admin/email-templates", h.ListEmailTemplates)

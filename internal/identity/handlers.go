@@ -79,6 +79,10 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	if domain.IsUserForbidden(user) {
+		domain.WriteAccountForbidden(w)
+		return
+	}
 	if user.Provider != domain.ProviderEmail && user.PasswordHash == "" {
 		http.Error(w, "Please login with "+user.Provider, http.StatusUnauthorized)
 		return

@@ -167,25 +167,8 @@ func (h *Handlers) UpdateUserRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allowed := false
-	if currentUser.Role == domain.RoleAdminGlobal {
-		allowed = true
-	} else if currentUser.Role == domain.RoleAdminLocal {
-		if currentUser.LinkedMachineID != nil {
-			myUsers, _ := h.users.GetUsersByMachineID(*currentUser.LinkedMachineID)
-			for _, u := range myUsers {
-				if u.ID == targetUserID {
-					allowed = true
-					break
-				}
-			}
-		}
-		if req.Role != domain.RoleUser && req.Role != domain.RoleGuestLocal {
-			allowed = false
-		}
-	}
-	if !allowed {
-		http.Error(w, "Forbidden: Insufficient Permissions", http.StatusForbidden)
+	if _, err := AuthorizeAdminTarget(h.users, currentUser, targetUserID, ActionUpdateRole, req.Role); err != nil {
+		writeAuthzError(w, err)
 		return
 	}
 
@@ -265,10 +248,22 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User Store not initialized", http.StatusServiceUnavailable)
 		return
 	}
+	email, _ := r.Context().Value(middleware.UserEmailKey).(string)
+	currentUser, err := h.users.GetUserByEmail(email)
+	if err != nil || currentUser == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid User ID", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := AuthorizeAdminTarget(h.users, currentUser, id, ActionUpdateLinks, ""); err != nil {
+		writeAuthzError(w, err)
 		return
 	}
 
@@ -293,15 +288,91 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	adminEmail, _ := r.Context().Value(middleware.UserEmailKey).(string)
-	adminID := 0
-	if u, err := h.users.GetUserByEmail(adminEmail); err == nil && u != nil {
-		adminID = u.ID
-	}
+	adminID := currentUser.ID
 	if target, err := h.users.GetUserByID(id); err == nil && target != nil {
-		_ = h.tryAutoSend(domain.EmailSlugDeviceAllocation, target, "", adminID, adminEmail, clientIP(r))
+		_ = h.tryAutoSend(domain.EmailSlugDeviceAllocation, target, "", adminID, email, clientIP(r))
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handlers) ForbidUser(w http.ResponseWriter, r *http.Request) {
+	if h.users == nil {
+		http.Error(w, "User Store not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	caller, target, idStr, ok := h.authorizeUserAction(w, r, ActionForbid)
+	if !ok {
+		return
+	}
+	if domain.IsUserForbidden(target) {
+		http.Error(w, "User already forbidden", http.StatusConflict)
+		return
+	}
+	if err := h.users.ForbidUser(target.ID); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	h.logAudit(caller.ID, caller.Email, "FORBID_USER", "USER", idStr, clientIP(r), "Forbidden user "+target.Email)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) UnforbidUser(w http.ResponseWriter, r *http.Request) {
+	if h.users == nil {
+		http.Error(w, "User Store not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	caller, target, idStr, ok := h.authorizeUserAction(w, r, ActionUnforbid)
+	if !ok {
+		return
+	}
+	if !domain.IsUserForbidden(target) {
+		http.Error(w, "User is not forbidden", http.StatusConflict)
+		return
+	}
+	if err := h.users.UnforbidUser(target.ID); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	h.logAudit(caller.ID, caller.Email, "UNFORBID_USER", "USER", idStr, clientIP(r), "Re-enabled user "+target.Email)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	if h.users == nil {
+		http.Error(w, "User Store not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	caller, target, idStr, ok := h.authorizeUserAction(w, r, ActionDelete)
+	if !ok {
+		return
+	}
+	if err := h.users.DeleteUser(target.ID); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	h.logAudit(caller.ID, caller.Email, "DELETE_USER", "USER", idStr, clientIP(r), "Deleted user "+target.Email)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) authorizeUserAction(w http.ResponseWriter, r *http.Request, action AdminAction) (*domain.User, *domain.User, string, bool) {
+	email, _ := r.Context().Value(middleware.UserEmailKey).(string)
+	caller, err := h.users.GetUserByEmail(email)
+	if err != nil || caller == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil, nil, "", false
+	}
+	idStr := chi.URLParam(r, "id")
+	targetID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid User ID", http.StatusBadRequest)
+		return nil, nil, "", false
+	}
+	target, err := AuthorizeAdminTarget(h.users, caller, targetID, action, "")
+	if err != nil {
+		writeAuthzError(w, err)
+		return nil, nil, "", false
+	}
+	return caller, target, idStr, true
 }
 
 func (h *Handlers) AuditLogs(w http.ResponseWriter, r *http.Request) {

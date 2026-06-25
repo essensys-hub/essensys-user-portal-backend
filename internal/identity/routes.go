@@ -24,7 +24,7 @@ func Mount(r chi.Router, users *data.UserStore) {
 	r.Post("/auth/apple/callback", h.AppleCallback)
 
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.UserJWT)
+		r.Use(middleware.UserJWTWithStore(users))
 		r.Get("/profile", h.GetProfile)
 		r.Put("/profile", h.UpdateProfile)
 		r.Delete("/profile", h.DeleteProfile)

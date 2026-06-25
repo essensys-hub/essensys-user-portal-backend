@@ -38,6 +38,10 @@ func getOAuthConfig() *oauth2.Config {
 	return googleOauthConfig
 }
 
+func redirectMaintenance(w http.ResponseWriter, req *http.Request) {
+	http.Redirect(w, req, domain.ForbiddenRedirectPath, http.StatusTemporaryRedirect)
+}
+
 func isAdminEmail(email, adminList string) bool {
 	for _, admin := range strings.Split(adminList, ",") {
 		if strings.TrimSpace(admin) == email {
@@ -111,6 +115,10 @@ func (h *Handlers) GoogleCallback(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} else {
+		if domain.IsUserForbidden(userDB) {
+			redirectMaintenance(w, req)
+			return
+		}
 		_ = h.users.UpdateLastLogin(userDB.ID)
 		role = userDB.Role
 	}
@@ -295,6 +303,10 @@ func (h *Handlers) AppleCallback(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} else {
+		if domain.IsUserForbidden(userDB) {
+			redirectMaintenance(w, req)
+			return
+		}
 		_ = h.users.UpdateLastLogin(userDB.ID)
 		role = userDB.Role
 	}

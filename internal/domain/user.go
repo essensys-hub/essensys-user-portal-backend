@@ -24,8 +24,9 @@ type User struct {
 	Provider        string    `db:"provider" json:"provider"`
 	ProviderID      string    `db:"provider_id" json:"-"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
-	LastLogin       time.Time `db:"last_login" json:"last_login"`
-	LinkedMachineID *int      `db:"linked_machine_id" json:"linked_machine_id"`
+	LastLogin       time.Time  `db:"last_login" json:"last_login"`
+	ForbiddenAt     *time.Time `db:"forbidden_at" json:"forbidden_at,omitempty"`
+	LinkedMachineID *int       `db:"linked_machine_id" json:"linked_machine_id"`
 	LinkedGatewayID *string   `db:"linked_gateway_id" json:"linked_gateway_id"`
 	LinkedArmoireID *int      `db:"linked_armoire_id" json:"linked_armoire_id"`
 }
