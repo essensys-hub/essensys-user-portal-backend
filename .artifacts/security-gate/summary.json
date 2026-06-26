@@ -1,0 +1,24 @@
+{
+  "blocking_findings": 0,
+  "secret_count": 0,
+  "secret_details": [],
+  "dependency_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "dependency_details": [],
+  "trivy_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 0
+  },
+  "trivy_details": [],
+  "bandit_high": 0,
+  "bandit_details": [],
+  "eslint_errors": 0,
+  "eslint_details": [],
+  "markdown": "<!-- security-gate -->\n# Security Gate\n\n- Blocking findings: **0**\n- Secrets detected: **0**\n- Dependency Critical: **0**\n- Dependency High: **0**\n- Trivy Critical: **0**\n- Trivy High: **0**\n- Bandit High: **0**\n- ESLint security errors: **0**\n\n> No blocking security finding detected by the local security gate.\n\n## Secret scan\n- No notable finding.\n\n## Dependency audit\n- No notable finding.\n\n## Trivy (CVE / IaC)\n- No notable finding.\n\n## Bandit\n- No notable finding.\n\n## ESLint security\n- No notable finding.\n"
+}
