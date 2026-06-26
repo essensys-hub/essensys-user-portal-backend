@@ -1,0 +1,68 @@
+name: Security Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: "8.24.2"
+
+jobs:
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare artifacts directory
+        run: mkdir -p .artifacts/security-gate
+
+      - name: Secret scan (gitleaks)
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks dir . \
+            --config .gitleaks.toml \
+            --report-format json \
+            --report-path .artifacts/security-gate/gitleaks.json \
+            --redact \
+            --no-banner
+
+      - name: CVE / SCA + IaC scan (Trivy)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: json
+          output: .artifacts/security-gate/trivy.json
+          severity: CRITICAL,HIGH,MEDIUM
+          scanners: vuln,misconfig
+          ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Summarize security gate (blocks on Critical/High)
+        run: python3 scripts/feature_lifecycle/summarize_security_gate.py
+
+      - name: Upload security artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-gate
+          path: .artifacts/security-gate/
+          retention-days: 14

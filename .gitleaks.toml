@@ -1,0 +1,56 @@
+# Gitleaks configuration for essensys-feature-lifecycle
+#
+# This config extends the default gitleaks ruleset and applies a global
+# allowlist for documented false positives that are inherited from
+# skills-portal (where the patterns were originally triaged in PR #138 on
+# 2026-06-01).
+#
+# Each pattern below is a non-secret reference (AWS ARN, redaction
+# placeholder, GitHub Actions secret reference, or content of a Cursor
+# agent transcript whose live secrets are already scrubbed by
+# scripts/sync_transcripts.sh). Real secrets must never be added to
+# this allowlist.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist — documented false positives"
+
+paths = [
+    # Cursor agent transcripts versioned via the project pre-commit hook.
+    # Their content is scrubbed by scripts/sync_transcripts.sh before
+    # being staged. Remaining hex/UUID signatures match generic-api-key
+    # but never carry live credentials.
+    '''^transcripts/''',
+    # Confluence snapshot — read-only mirror of pages already published
+    # internally; documents secret names (not values).
+    '''^confluence-snapshot/''',
+    # Project documentation describing AWS Secrets Manager ARNs.
+    '''^docs/''',
+    # Operations / infra READMEs and example env files (the .env itself
+    # is gitignored; only .env.example is versioned and uses placeholders).
+    '''^README\.md$''',
+    '''^AGENTS\.md$''',
+    '''^\.env\.example$''',
+]
+
+regexes = [
+    # AWS Secrets Manager ARN — the chunk after `secret:` is the secret
+    # name (with AWS-generated suffix), not the secret value.
+    '''arn:aws:secretsmanager:[a-z0-9-]+:[0-9]+:secret:[A-Za-z0-9_./-]+''',
+    # AWS Secrets Manager *secret name* extracted by gitleaks from the
+    # ARN above. Common convention:
+    #  - <UPPERCASE_NAME>_<YYYYMMDD>-<aws_suffix> for certificate secrets
+    #    (e.g. CORP_CA_CHAIN_PEM_20230918-yr1xnv).
+    '''^[A-Z][A-Z0-9_]+_[0-9]{8}-[A-Za-z0-9]+$''',
+    #  - <kebab-case-name>-<aws_suffix> for application config secrets
+    #    (e.g. essensys-feature-lifecycle-g24zQw).
+    '''^[a-z][a-z0-9-]+-[A-Za-z0-9]{6}$''',
+    # Literal redaction marker emitted by the transcripts scrubber and
+    # used in documentation examples.
+    '''\bREDACTED\b''',
+    # GitHub Actions secret reference — the value is resolved at runtime,
+    # the source file only contains the variable name.
+    '''\$\{\{\s*secrets\.[A-Z0-9_]+\s*\}\}''',
+]

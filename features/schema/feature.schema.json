@@ -1,0 +1,501 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skills-portal.local/features/schema/feature.schema.json",
+  "title": "Skills Portal Feature Manifest",
+  "description": "Git-tracked source of truth for feature lifecycle automation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "id",
+    "title",
+    "status",
+    "owner",
+    "jira",
+    "git",
+    "openspec",
+    "implementation",
+    "userguide",
+    "tests",
+    "confluence",
+    "release",
+    "security"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "./schema/feature.schema.json"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "minLength": 3,
+      "maxLength": 80
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 200
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "in-progress",
+        "merged",
+        "archived"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "jira": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue",
+        "test_plan"
+      ],
+      "properties": {
+        "issue": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_plan": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch",
+        "pr_url"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pr_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        }
+      }
+    },
+    "openspec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "change_id",
+        "path"
+      ],
+      "properties": {
+        "change_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "path": {
+          "$ref": "#/$defs/pathString"
+        },
+        "proposal": {
+          "$ref": "#/$defs/nullablePathString"
+        },
+        "design": {
+          "$ref": "#/$defs/nullablePathString"
+        },
+        "tasks": {
+          "$ref": "#/$defs/nullablePathString"
+        },
+        "specs": {
+          "$ref": "#/$defs/pathArray"
+        }
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paths"
+      ],
+      "properties": {
+        "paths": {
+          "$ref": "#/$defs/pathArrayMinOne"
+        },
+        "primary_surface": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "react-user",
+            "react-admin",
+            "api",
+            "cli-node",
+            "cli-go",
+            "ci",
+            "ops",
+            "mixed",
+            null
+          ]
+        }
+      }
+    },
+    "userguide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pages",
+        "language",
+        "i18n_keys",
+        "screenshots"
+      ],
+      "properties": {
+        "pages": {
+          "$ref": "#/$defs/pathArrayMinOne"
+        },
+        "language": {
+          "type": "string",
+          "enum": [
+            "fr",
+            "en",
+            "de",
+            "es",
+            "zh",
+            "ja",
+            "multi"
+          ]
+        },
+        "i18n_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "uniqueItems": true
+        },
+        "screenshots": {
+          "$ref": "#/$defs/pathArray"
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "playwright",
+        "coverage_must_test"
+      ],
+      "properties": {
+        "playwright": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "pytest": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "testthat": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "coverage_must_test": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 5
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "smoke_tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9._-]+$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "playwright": {
+                  "minItems": 1
+                }
+              }
+            },
+            {
+              "properties": {
+                "pytest": {
+                  "minItems": 1
+                }
+              }
+            },
+            {
+              "properties": {
+                "testthat": {
+                  "minItems": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "confluence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "space",
+        "parent_page",
+        "template",
+        "draft_page_id",
+        "published_page_id"
+      ],
+      "properties": {
+        "space": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_page": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "template": {
+          "type": "string",
+          "minLength": 1
+        },
+        "draft_page_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]+$"
+        },
+        "published_page_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]+$"
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "changelog_entry",
+        "target_tag"
+      ],
+      "properties": {
+        "changelog_entry": {
+          "type": "string",
+          "minLength": 3
+        },
+        "target_tag": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "surfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "paths": {
+          "$ref": "#/$defs/pathArray"
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sca_tool",
+        "dependabot_alerts_url",
+        "last_scan_at",
+        "cve_findings",
+        "secret_scan",
+        "muted_findings",
+        "threat_model_url",
+        "owner_security"
+      ],
+      "properties": {
+        "sca_tool": {
+          "type": "string",
+          "minLength": 1,
+          "default": "dependabot"
+        },
+        "dependabot_alerts_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "last_scan_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "cve_findings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "secret_scan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "tool",
+            "last_scan_at"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "clean",
+                "warning",
+                "failed"
+              ]
+            },
+            "tool": {
+              "type": "string",
+              "minLength": 1
+            },
+            "last_scan_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        },
+        "muted_findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "severity",
+              "justification_url",
+              "expires_at"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "justification_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "threat_model_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "owner_security": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pathString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/).+"
+    },
+    "nullablePathString": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "pattern": "^(?!/).+"
+    },
+    "pathArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pathString"
+      },
+      "uniqueItems": true
+    },
+    "pathArrayMinOne": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/pathArray"
+        },
+        {
+          "minItems": 1
+        }
+      ]
+    }
+  }
+}
