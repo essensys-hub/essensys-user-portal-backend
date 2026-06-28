@@ -284,12 +284,21 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 		req.ArmoireID = nil
 		req.MachineID = nil
 	}
+	target, err := h.users.GetUserByID(id)
+	if err != nil || target == nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	if err := domain.ValidateNoPortalLinkRemoval(target, req.MachineID, req.GatewayID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if err := h.users.UpdateUserLinks(id, req.MachineID, req.GatewayID, req.ArmoireID); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	adminID := currentUser.ID
-	if target, err := h.users.GetUserByID(id); err == nil && target != nil {
+	if target != nil {
 		_ = h.tryAutoSend(domain.EmailSlugDeviceAllocation, target, "", adminID, email, clientIP(r))
 	}
 	w.WriteHeader(http.StatusOK)
