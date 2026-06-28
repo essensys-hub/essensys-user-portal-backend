@@ -289,10 +289,6 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	if err := domain.ValidateNoPortalLinkRemoval(target, req.MachineID, req.GatewayID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	if err := h.users.UpdateUserLinks(id, req.MachineID, req.GatewayID, req.ArmoireID); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
