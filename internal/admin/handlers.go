@@ -284,6 +284,10 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 		req.ArmoireID = nil
 		req.MachineID = nil
 	}
+	if err := domain.ValidateAdminUserLinks(req.MachineID, req.GatewayID, req.ArmoireID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	target, err := h.users.GetUserByID(id)
 	if err != nil || target == nil {
 		http.Error(w, "User not found", http.StatusNotFound)

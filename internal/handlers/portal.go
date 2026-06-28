@@ -50,7 +50,7 @@ func (h *Handler) CreateLinkRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	if !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+	if user.LinkedGatewayID != nil && !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
 		http.Error(w, "Gateway not eligible for remote portal", http.StatusForbidden)
 		return
 	}
@@ -79,8 +79,7 @@ func (h *Handler) LinkRequestStatus(w http.ResponseWriter, r *http.Request) {
 	lr, err := h.store.GetLatestLinkRequest(r.Context(), user.ID)
 	approved, _ := h.store.UserHasApprovedLink(r.Context(), user.ID)
 	portalAccess := approved &&
-		user.LinkedMachineID != nil && user.LinkedGatewayID != nil &&
-		domain.IsRemoteEligibleGateway(user.LinkedGatewayID)
+		domain.UserPortalAccessEligible(user.LinkedMachineID, user.LinkedGatewayID, user.LinkedArmoireID)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":              "none",
@@ -224,13 +223,8 @@ func (h *Handler) Inject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	approved, _ := h.store.UserHasApprovedLink(r.Context(), user.ID)
-	if !approved || user.LinkedMachineID == nil {
+	if !h.userPortalAccess(r.Context(), user) {
 		http.Error(w, "Portal access not approved", http.StatusForbidden)
-		return
-	}
-	if !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
-		http.Error(w, "Gateway not eligible for remote portal", http.StatusForbidden)
 		return
 	}
 
@@ -275,13 +269,8 @@ func (h *Handler) InjectBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	approved, _ := h.store.UserHasApprovedLink(r.Context(), user.ID)
-	if !approved || user.LinkedMachineID == nil {
+	if !h.userPortalAccess(r.Context(), user) {
 		http.Error(w, "Portal access not approved", http.StatusForbidden)
-		return
-	}
-	if !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
-		http.Error(w, "Gateway not eligible for remote portal", http.StatusForbidden)
 		return
 	}
 
@@ -528,7 +517,10 @@ func (h *Handler) requirePortalAccess(w http.ResponseWriter, r *http.Request) bo
 }
 
 func (h *Handler) userPortalAccess(ctx context.Context, user *domain.UserProfile) bool {
-	if user == nil || user.LinkedMachineID == nil || !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+	if user == nil {
+		return false
+	}
+	if !domain.UserPortalAccessEligible(user.LinkedMachineID, user.LinkedGatewayID, user.LinkedArmoireID) {
 		return false
 	}
 	ok, _ := h.store.UserHasApprovedLink(ctx, user.ID)
