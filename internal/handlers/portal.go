@@ -188,22 +188,14 @@ func (h *Handler) resolveArmoire(armoireID, machineID *int) *domain.MachineDetai
 	if h.inventory == nil {
 		return nil
 	}
-	machines, err := h.inventory.GetMachines()
-	if err != nil {
-		return nil
-	}
 	if armoireID != nil {
-		for _, m := range machines {
-			if m.ID == *armoireID {
-				return m
-			}
+		if m, err := h.inventory.GetMachineByID(*armoireID); err == nil {
+			return m
 		}
 	}
 	if machineID != nil {
-		for _, m := range machines {
-			if m.ID == *machineID {
-				return m
-			}
+		if m, err := h.inventory.GetMachineByID(*machineID); err == nil {
+			return m
 		}
 	}
 	return nil

@@ -156,30 +156,27 @@ func (s *LegacyIoTStore) BindMachineForPortalDelivery(hashedPkey string, portalM
 	return nil
 }
 
-// PortalMachineIDFromHashedPkey resolves the cloud_actions.machine_id for an armoire poll.
-// Prefers numeric client_id; falls back to admin inventory ordering (last_seen DESC).
+// PortalMachineIDFromHashedPkey resolves cloud_actions.machine_id for an armoire poll.
+// Prefers numeric client_id; falls back to stable machines.id.
 func (s *LegacyIoTStore) PortalMachineIDFromHashedPkey(hashedPkey string) (int, error) {
-	var clientID *string
-	err := s.db.Get(&clientID, `SELECT client_id FROM machines WHERE hashed_pkey = $1`, hashedPkey)
-	if err != nil {
-		return 0, err
+	var row struct {
+		ClientID *string `db:"client_id"`
+		ID       int     `db:"id"`
 	}
-	if clientID != nil && *clientID != "" {
-		var machineID int
-		if _, err := fmt.Sscanf(*clientID, "%d", &machineID); err == nil && machineID > 0 {
-			return machineID, nil
-		}
-	}
-	var invID int
-	err = s.db.Get(&invID, `
-		SELECT inv_id FROM (
-			SELECT hashed_pkey, ROW_NUMBER() OVER (ORDER BY last_seen DESC NULLS LAST) AS inv_id
-			FROM machines
-		) ranked WHERE hashed_pkey = $1`, hashedPkey)
+	err := s.db.Get(&row, `SELECT client_id, id FROM machines WHERE hashed_pkey = $1`, hashedPkey)
 	if err != nil {
 		return 0, fmt.Errorf("unknown machine")
 	}
-	return invID, nil
+	if row.ClientID != nil && *row.ClientID != "" {
+		var machineID int
+		if _, err := fmt.Sscanf(*row.ClientID, "%d", &machineID); err == nil && machineID > 0 {
+			return machineID, nil
+		}
+	}
+	if row.ID > 0 {
+		return row.ID, nil
+	}
+	return 0, fmt.Errorf("unknown machine")
 }
 
 func (s *LegacyIoTStore) ImportMachine(hashedPkey, clientID, ip string, isActive bool, lastSeen time.Time, authDecoded json.RawMessage) error {
@@ -187,9 +184,12 @@ func (s *LegacyIoTStore) ImportMachine(hashedPkey, clientID, ip string, isActive
 		INSERT INTO machines (hashed_pkey, client_id, ip_address, is_active, last_seen, auth_decoded)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (hashed_pkey) DO UPDATE SET
-			client_id = EXCLUDED.client_id,
+			client_id = CASE
+				WHEN machines.client_id ~ '^[0-9]+$' THEN machines.client_id
+				ELSE EXCLUDED.client_id
+			END,
 			ip_address = COALESCE(EXCLUDED.ip_address, machines.ip_address),
-			is_active = EXCLUDED.is_active,
+			is_active = machines.is_active OR EXCLUDED.is_active,
 			last_seen = COALESCE(EXCLUDED.last_seen, machines.last_seen),
 			auth_decoded = COALESCE(EXCLUDED.auth_decoded, machines.auth_decoded)`,
 		hashedPkey, clientID, nullString(ip), isActive, lastSeen, authDecoded)

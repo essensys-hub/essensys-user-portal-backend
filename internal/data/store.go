@@ -184,17 +184,25 @@ func (s *PortalStore) FetchPendingActionsForMachine(ctx context.Context, machine
 }
 
 func (s *PortalStore) MachineIDFromHashedPkey(ctx context.Context, hashedPkey string) (int, error) {
-	var clientID *string
-	err := s.db.GetContext(ctx, &clientID, `
-		SELECT client_id FROM machines WHERE hashed_pkey = $1`, hashedPkey)
-	if err != nil || clientID == nil || *clientID == "" {
+	var row struct {
+		ClientID *string `db:"client_id"`
+		ID       int     `db:"id"`
+	}
+	err := s.db.GetContext(ctx, &row, `
+		SELECT client_id, id FROM machines WHERE hashed_pkey = $1`, hashedPkey)
+	if err != nil {
 		return 0, fmt.Errorf("unknown machine")
 	}
-	var machineID int
-	if _, err := fmt.Sscanf(*clientID, "%d", &machineID); err != nil || machineID <= 0 {
-		return 0, fmt.Errorf("non-numeric client_id %q", *clientID)
+	if row.ClientID != nil && *row.ClientID != "" {
+		var machineID int
+		if _, err := fmt.Sscanf(*row.ClientID, "%d", &machineID); err == nil && machineID > 0 {
+			return machineID, nil
+		}
 	}
-	return machineID, nil
+	if row.ID > 0 {
+		return row.ID, nil
+	}
+	return 0, fmt.Errorf("non-numeric client_id for machine")
 }
 
 func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gatewayID string, limit int) ([]domain.CloudAction, error) {

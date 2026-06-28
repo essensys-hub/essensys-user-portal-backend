@@ -26,6 +26,7 @@ func (s *AdminInventoryStore) GetStats() (*domain.AdminStatsResponse, error) {
 }
 
 type machineRow struct {
+	ID         int             `db:"id"`
 	HashedPkey string          `db:"hashed_pkey"`
 	ClientID   *string         `db:"client_id"`
 	IPAddress  *string         `db:"ip_address"`
@@ -37,7 +38,7 @@ type machineRow struct {
 func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 	var rows []machineRow
 	if err := s.db.Select(&rows, `
-		SELECT hashed_pkey, client_id, ip_address, last_seen,
+		SELECT id, hashed_pkey, client_id, ip_address, last_seen,
 		       COALESCE(geo, '{}'::jsonb) AS geo,
 		       COALESCE(auth_decoded, '{}'::jsonb) AS auth_decoded
 		FROM machines
@@ -46,10 +47,10 @@ func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 	}
 
 	list := make([]*domain.MachineDetail, 0, len(rows))
-	for i, row := range rows {
+	for _, row := range rows {
 		d := &domain.MachineDetail{
-			ID:      i + 1,
-			NoSerie: derefString(row.ClientID, row.HashedPkey[:min(8, len(row.HashedPkey))]),
+			ID:      row.ID,
+			NoSerie: derefString(row.ClientID, "UNKNOWN-"+row.HashedPkey[:min(8, len(row.HashedPkey))]),
 			IP:      derefString(row.IPAddress, "-"),
 		}
 		if row.LastSeen != nil {
@@ -82,22 +83,42 @@ func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 	return list, nil
 }
 
-// HashedPkeyByInventoryID returns the hashed_pkey for an admin inventory row ID
-// (1-based index, same ordering as GetMachines).
+// HashedPkeyByInventoryID returns the hashed_pkey for a stable machines.id.
 func (s *AdminInventoryStore) HashedPkeyByInventoryID(id int) (string, error) {
 	if id <= 0 {
 		return "", fmt.Errorf("invalid inventory id %d", id)
 	}
 	var hashedPkey string
-	err := s.db.Get(&hashedPkey, `
-		SELECT hashed_pkey FROM (
-			SELECT hashed_pkey, ROW_NUMBER() OVER (ORDER BY last_seen DESC NULLS LAST) AS inv_id
-			FROM machines
-		) ranked WHERE inv_id = $1`, id)
+	err := s.db.Get(&hashedPkey, `SELECT hashed_pkey FROM machines WHERE id = $1`, id)
 	if err != nil {
 		return "", fmt.Errorf("inventory id %d: %w", id, err)
 	}
 	return hashedPkey, nil
+}
+
+// GetMachineByID returns one inventory row by stable machines.id.
+func (s *AdminInventoryStore) GetMachineByID(id int) (*domain.MachineDetail, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid machine id %d", id)
+	}
+	var row machineRow
+	err := s.db.Get(&row, `
+		SELECT id, hashed_pkey, client_id, ip_address, last_seen,
+		       COALESCE(geo, '{}'::jsonb) AS geo,
+		       COALESCE(auth_decoded, '{}'::jsonb) AS auth_decoded
+		FROM machines WHERE id = $1`, id)
+	if err != nil {
+		return nil, err
+	}
+	d := &domain.MachineDetail{
+		ID:      row.ID,
+		NoSerie: derefString(row.ClientID, "UNKNOWN-"+row.HashedPkey[:min(8, len(row.HashedPkey))]),
+		IP:      derefString(row.IPAddress, "-"),
+	}
+	if row.LastSeen != nil {
+		d.LastSeen = *row.LastSeen
+	}
+	return d, nil
 }
 
 type gatewayRow struct {
