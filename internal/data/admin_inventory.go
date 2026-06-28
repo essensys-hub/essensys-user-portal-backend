@@ -3,6 +3,7 @@ package data
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
@@ -50,7 +51,7 @@ func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 	for _, row := range rows {
 		d := &domain.MachineDetail{
 			ID:      row.ID,
-			NoSerie: derefString(row.ClientID, "UNKNOWN-"+row.HashedPkey[:min(8, len(row.HashedPkey))]),
+			NoSerie: machineDisplaySerie(row.ClientID, row.HashedPkey),
 			IP:      derefString(row.IPAddress, "-"),
 		}
 		if row.LastSeen != nil {
@@ -112,7 +113,7 @@ func (s *AdminInventoryStore) GetMachineByID(id int) (*domain.MachineDetail, err
 	}
 	d := &domain.MachineDetail{
 		ID:      row.ID,
-		NoSerie: derefString(row.ClientID, "UNKNOWN-"+row.HashedPkey[:min(8, len(row.HashedPkey))]),
+		NoSerie: machineDisplaySerie(row.ClientID, row.HashedPkey),
 		IP:      derefString(row.IPAddress, "-"),
 	}
 	if row.LastSeen != nil {
@@ -156,6 +157,30 @@ func derefString(p *string, fallback string) string {
 		return *p
 	}
 	return fallback
+}
+
+// machineDisplaySerie shows UNKNOWN-{hash} in admin UI even when client_id is a portal numeric bind.
+func machineDisplaySerie(clientID *string, hashedPkey string) string {
+	prefix := hashedPkey
+	if len(prefix) > 8 {
+		prefix = prefix[:8]
+	}
+	label := fmt.Sprintf("UNKNOWN-%s", prefix)
+	if clientID == nil || *clientID == "" {
+		return label
+	}
+	cid := strings.TrimSpace(*clientID)
+	if cid == "" {
+		return label
+	}
+	var n int
+	if _, err := fmt.Sscanf(cid, "%d", &n); err == nil && n > 0 {
+		return label
+	}
+	if strings.HasPrefix(cid, "UNKNOWN-") {
+		return cid
+	}
+	return cid
 }
 
 func min(a, b int) int {
