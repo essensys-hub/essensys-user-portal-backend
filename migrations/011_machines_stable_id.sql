@@ -3,6 +3,19 @@
 
 ALTER TABLE machines ADD COLUMN IF NOT EXISTS id INTEGER;
 
+-- One numeric client_id per armoire (portal bind); duplicates came from manual hotfixes.
+WITH ranked AS (
+    SELECT hashed_pkey,
+           ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY last_seen DESC NULLS LAST) AS rn
+    FROM machines
+    WHERE client_id ~ '^[0-9]+$'
+)
+UPDATE machines m
+SET client_id = 'UNKNOWN-' || left(m.hashed_pkey, 8),
+    is_active = false
+FROM ranked r
+WHERE m.hashed_pkey = r.hashed_pkey AND r.rn > 1;
+
 DO $$
 DECLARE
     max_id INTEGER;
@@ -11,14 +24,12 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Keep portal links that already used numeric client_id (armoire-seule bind).
     UPDATE machines
     SET id = client_id::INTEGER
     WHERE id IS NULL
       AND client_id ~ '^[0-9]+$'
       AND NOT EXISTS (
-          SELECT 1 FROM machines m2
-          WHERE m2.id = machines.client_id::INTEGER
+          SELECT 1 FROM machines m2 WHERE m2.id = machines.client_id::INTEGER
       );
 
     SELECT COALESCE(MAX(id), 0) INTO max_id FROM machines;
