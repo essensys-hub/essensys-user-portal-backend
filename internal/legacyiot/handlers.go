@@ -2,6 +2,7 @@ package legacyiot
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -47,9 +48,20 @@ func (h *Handlers) ServerInfos(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) MyStatus(w http.ResponseWriter, r *http.Request) {
 	clientID, _ := r.Context().Value(middleware.LegacyClientIDKey).(string)
-	var payload domain.MyStatusPayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	normalized, err := NormalizeJSON(body)
+	if err != nil {
 		log.Printf("[legacyiot] MyStatus bad request from %s: %v", clientID, err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	var payload domain.MyStatusPayload
+	if err := json.Unmarshal(normalized, &payload); err != nil {
+		log.Printf("[legacyiot] MyStatus parse from %s: %v", clientID, err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
