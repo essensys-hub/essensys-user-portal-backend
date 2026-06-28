@@ -48,6 +48,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 				Users:     users,
 				Audit:     audit,
 				Inventory: inventory,
+				IoT:       iot,
 				News:      news,
 				Templates: templates,
 				Portal:    store,

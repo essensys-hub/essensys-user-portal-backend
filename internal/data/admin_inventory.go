@@ -2,6 +2,7 @@ package data
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
@@ -79,6 +80,24 @@ func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 		list = append(list, d)
 	}
 	return list, nil
+}
+
+// HashedPkeyByInventoryID returns the hashed_pkey for an admin inventory row ID
+// (1-based index, same ordering as GetMachines).
+func (s *AdminInventoryStore) HashedPkeyByInventoryID(id int) (string, error) {
+	if id <= 0 {
+		return "", fmt.Errorf("invalid inventory id %d", id)
+	}
+	var hashedPkey string
+	err := s.db.Get(&hashedPkey, `
+		SELECT hashed_pkey FROM (
+			SELECT hashed_pkey, ROW_NUMBER() OVER (ORDER BY last_seen DESC NULLS LAST) AS inv_id
+			FROM machines
+		) ranked WHERE inv_id = $1`, id)
+	if err != nil {
+		return "", fmt.Errorf("inventory id %d: %w", id, err)
+	}
+	return hashedPkey, nil
 }
 
 type gatewayRow struct {

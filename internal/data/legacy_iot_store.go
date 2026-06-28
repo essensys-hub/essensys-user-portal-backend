@@ -138,6 +138,50 @@ func (s *LegacyIoTStore) SaveGateway(gw *domain.GatewayStatus) error {
 	return nil
 }
 
+// BindMachineForPortalDelivery activates an armoire for strict legacy IoT auth and
+// sets client_id to the portal machine_id (admin inventory index) so myactions
+// can deliver cloud_actions queued for that id.
+func (s *LegacyIoTStore) BindMachineForPortalDelivery(hashedPkey string, portalMachineID int) error {
+	if portalMachineID <= 0 {
+		return fmt.Errorf("invalid portal machine id %d", portalMachineID)
+	}
+	clientID := fmt.Sprintf("%d", portalMachineID)
+	_, err := s.db.Exec(`
+		UPDATE machines SET is_active = true, client_id = $2
+		WHERE hashed_pkey = $1`, hashedPkey, clientID)
+	if err != nil {
+		return err
+	}
+	log.Printf("[legacyiot] bound %s for portal machine_id=%d", prefixHash(hashedPkey, 8), portalMachineID)
+	return nil
+}
+
+// PortalMachineIDFromHashedPkey resolves the cloud_actions.machine_id for an armoire poll.
+// Prefers numeric client_id; falls back to admin inventory ordering (last_seen DESC).
+func (s *LegacyIoTStore) PortalMachineIDFromHashedPkey(hashedPkey string) (int, error) {
+	var clientID *string
+	err := s.db.Get(&clientID, `SELECT client_id FROM machines WHERE hashed_pkey = $1`, hashedPkey)
+	if err != nil {
+		return 0, err
+	}
+	if clientID != nil && *clientID != "" {
+		var machineID int
+		if _, err := fmt.Sscanf(*clientID, "%d", &machineID); err == nil && machineID > 0 {
+			return machineID, nil
+		}
+	}
+	var invID int
+	err = s.db.Get(&invID, `
+		SELECT inv_id FROM (
+			SELECT hashed_pkey, ROW_NUMBER() OVER (ORDER BY last_seen DESC NULLS LAST) AS inv_id
+			FROM machines
+		) ranked WHERE hashed_pkey = $1`, hashedPkey)
+	if err != nil {
+		return 0, fmt.Errorf("unknown machine")
+	}
+	return invID, nil
+}
+
 func (s *LegacyIoTStore) ImportMachine(hashedPkey, clientID, ip string, isActive bool, lastSeen time.Time, authDecoded json.RawMessage) error {
 	_, err := s.db.Exec(`
 		INSERT INTO machines (hashed_pkey, client_id, ip_address, is_active, last_seen, auth_decoded)
@@ -157,4 +201,11 @@ func nullString(s string) interface{} {
 		return nil
 	}
 	return s
+}
+
+func prefixHash(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }

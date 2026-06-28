@@ -20,6 +20,7 @@ type Handlers struct {
 	users     *data.UserStore
 	audit     *data.AuditStore
 	inventory *data.AdminInventoryStore
+	iot       *data.LegacyIoTStore
 	news      *data.NewsletterStore
 	templates *data.EmailTemplateStore
 	portal    *data.PortalStore
@@ -29,6 +30,7 @@ type Deps struct {
 	Users     *data.UserStore
 	Audit     *data.AuditStore
 	Inventory *data.AdminInventoryStore
+	IoT       *data.LegacyIoTStore
 	News      *data.NewsletterStore
 	Templates *data.EmailTemplateStore
 	Portal    *data.PortalStore
@@ -39,6 +41,7 @@ func NewHandlers(d Deps) *Handlers {
 		users:     d.Users,
 		audit:     d.Audit,
 		inventory: d.Inventory,
+		iot:       d.IoT,
 		news:      d.News,
 		templates: d.Templates,
 		portal:    d.Portal,
@@ -297,6 +300,9 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+	if err := h.bindArmoireForPortalDelivery(req.MachineID, req.ArmoireID, req.GatewayID); err != nil {
+		log.Printf("[admin] bind armoire for portal: %v", err)
+	}
 	adminID := currentUser.ID
 	if target != nil {
 		_ = h.tryAutoSend(domain.EmailSlugDeviceAllocation, target, "", adminID, email, clientIP(r))
@@ -433,6 +439,31 @@ func (h *Handlers) AuditLogs(w http.ResponseWriter, r *http.Request) {
 		logs = []*domain.AuditLog{}
 	}
 	writeJSON(w, http.StatusOK, logs)
+}
+
+// bindArmoireForPortalDelivery activates the selected armoire for legacy IoT strict auth
+// when the user is in armoire-seule mode (no remote-eligible gateway).
+func (h *Handlers) bindArmoireForPortalDelivery(machineID, armoireID *int, gatewayID *string) error {
+	if h.inventory == nil || h.iot == nil {
+		return nil
+	}
+	if gatewayID != nil && domain.IsRemoteEligibleGateway(gatewayID) {
+		return nil
+	}
+	portalID := 0
+	if armoireID != nil && *armoireID > 0 {
+		portalID = *armoireID
+	} else if machineID != nil && *machineID > 0 {
+		portalID = *machineID
+	}
+	if portalID <= 0 {
+		return nil
+	}
+	hashedPkey, err := h.inventory.HashedPkeyByInventoryID(portalID)
+	if err != nil {
+		return err
+	}
+	return h.iot.BindMachineForPortalDelivery(hashedPkey, portalID)
 }
 
 func (h *Handlers) logAudit(userID int, username, action, resourceType, resourceID, ip, details string) {

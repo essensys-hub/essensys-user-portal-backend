@@ -67,7 +67,14 @@ func (h *Handlers) MyActions(w http.ResponseWriter, r *http.Request) {
 	if h.portal != nil {
 		hashedPkey, _ := r.Context().Value(middleware.LegacyHashedPkeyKey).(string)
 		if hashedPkey != "" {
-			if machineID, err := h.portal.MachineIDFromHashedPkey(r.Context(), hashedPkey); err == nil {
+			var machineID int
+			var err error
+			if h.store != nil {
+				machineID, err = h.store.PortalMachineIDFromHashedPkey(hashedPkey)
+			} else {
+				machineID, err = h.portal.MachineIDFromHashedPkey(r.Context(), hashedPkey)
+			}
+			if err == nil {
 				actions, err := h.portal.FetchPendingActionsForMachine(r.Context(), machineID, 20)
 				if err != nil {
 					log.Printf("[legacyiot] myactions machine %d: %v", machineID, err)
