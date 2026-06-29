@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -165,22 +166,39 @@ func (s *PortalStore) FetchPendingActionsForMachine(ctx context.Context, machine
 	if err != nil {
 		return nil, err
 	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
 
-	out := make([]domain.CloudAction, 0, len(rows))
+	paramChunks := make([][]domain.ExchangeKV, 0, len(rows))
+	guids := make([]string, 0, len(rows))
 	for _, r := range rows {
 		var params []domain.ExchangeKV
 		if err := json.Unmarshal(r.Params, &params); err != nil {
 			return nil, err
 		}
-		out = append(out, domain.CloudAction{
-			GUID: r.GUID, UserID: r.UserID, MachineID: r.MachineID,
-			Params: params, Status: r.Status, CreatedAt: r.CreatedAt,
-		})
+		paramChunks = append(paramChunks, params)
+		guids = append(guids, r.GUID)
+	}
+
+	last := rows[len(rows)-1]
+	deliverParams := paramChunks[len(paramChunks)-1]
+	if len(rows) > 1 {
+		deliverParams = domain.MergeExchangeParams(paramChunks...)
+		log.Printf("[portal] coalesced %d pending cloud_actions for machine %d into guid %s",
+			len(rows), machineID, last.GUID)
+	}
+
+	for _, guid := range guids {
 		_, _ = s.db.ExecContext(ctx, `
 			UPDATE cloud_actions SET status = $1, delivered_at = NOW() WHERE guid = $2`,
-			domain.ActionStatusDelivered, r.GUID)
+			domain.ActionStatusDelivered, guid)
 	}
-	return out, nil
+
+	return []domain.CloudAction{{
+		GUID: last.GUID, UserID: last.UserID, MachineID: last.MachineID,
+		Params: deliverParams, Status: domain.ActionStatusPending, CreatedAt: last.CreatedAt,
+	}}, nil
 }
 
 func (s *PortalStore) MachineIDFromHashedPkey(ctx context.Context, hashedPkey string) (int, error) {
@@ -217,9 +235,18 @@ func (s *PortalStore) FetchPendingActionsForGateway(ctx context.Context, gateway
 }
 
 func (s *PortalStore) MarkActionDone(ctx context.Context, guid string) error {
+	var machineID *int
+	err := s.db.GetContext(ctx, &machineID, `
+		SELECT machine_id FROM cloud_actions WHERE guid = $1`, guid)
+	if err != nil {
+		return fmt.Errorf("action not found")
+	}
+
 	res, err := s.db.ExecContext(ctx, `
-		UPDATE cloud_actions SET status = $1, done_at = NOW() WHERE guid = $2`,
-		domain.ActionStatusDone, guid)
+		UPDATE cloud_actions SET status = $1, done_at = NOW()
+		WHERE guid = $2
+		   OR (machine_id = $3 AND status = $4)`,
+		domain.ActionStatusDone, guid, machineID, domain.ActionStatusDelivered)
 	if err != nil {
 		return err
 	}
