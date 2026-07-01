@@ -27,32 +27,42 @@ func (s *AdminInventoryStore) GetStats() (*domain.AdminStatsResponse, error) {
 }
 
 type machineRow struct {
-	ID         int             `db:"id"`
-	HashedPkey string          `db:"hashed_pkey"`
-	ClientID   *string         `db:"client_id"`
-	IPAddress  *string         `db:"ip_address"`
-	LastSeen   *time.Time      `db:"last_seen"`
-	Geo        json.RawMessage `db:"geo"`
+	ID          int             `db:"id"`
+	HashedPkey  string          `db:"hashed_pkey"`
+	ClientID    *string         `db:"client_id"`
+	MacAddress  *string         `db:"mac_address"`
+	Eth1MAC     *string         `db:"eth1_mac"`
+	IPAddress   *string         `db:"ip_address"`
+	LastSeen    *time.Time      `db:"last_seen"`
+	Geo         json.RawMessage `db:"geo"`
 	AuthDecoded json.RawMessage `db:"auth_decoded"`
 }
 
 func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 	var rows []machineRow
 	if err := s.db.Select(&rows, `
-		SELECT id, hashed_pkey, client_id, ip_address, last_seen,
-		       COALESCE(geo, '{}'::jsonb) AS geo,
-		       COALESCE(auth_decoded, '{}'::jsonb) AS auth_decoded
-		FROM machines
-		ORDER BY last_seen DESC NULLS LAST`); err != nil {
+		SELECT m.id, m.hashed_pkey, m.client_id, m.mac_address, m.ip_address, m.last_seen,
+		       COALESCE(m.geo, '{}'::jsonb) AS geo,
+		       COALESCE(m.auth_decoded, '{}'::jsonb) AS auth_decoded,
+		       gs.eth1_mac
+		FROM machines m
+		LEFT JOIN LATERAL (
+			SELECT eth1_mac FROM gateway_sessions
+			WHERE machine_id = m.id AND eth1_mac IS NOT NULL AND eth1_mac <> ''
+			ORDER BY last_seen DESC NULLS LAST
+			LIMIT 1
+		) gs ON true
+		ORDER BY m.last_seen DESC NULLS LAST`); err != nil {
 		return []*domain.MachineDetail{}, err
 	}
 
 	list := make([]*domain.MachineDetail, 0, len(rows))
 	for _, row := range rows {
 		d := &domain.MachineDetail{
-			ID:      row.ID,
-			NoSerie: machineDisplaySerie(row.ClientID, row.HashedPkey),
-			IP:      derefString(row.IPAddress, "-"),
+			ID:         row.ID,
+			NoSerie:    machineDisplaySerie(row.ClientID, row.HashedPkey),
+			MacAddress: resolveMachineMAC(row.MacAddress, row.Eth1MAC),
+			IP:         derefString(row.IPAddress, "-"),
 		}
 		if row.LastSeen != nil {
 			d.LastSeen = *row.LastSeen
@@ -81,6 +91,7 @@ func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 		}
 		list = append(list, d)
 	}
+	s.backfillMissingMACs(list)
 	return list, nil
 }
 
@@ -104,17 +115,26 @@ func (s *AdminInventoryStore) GetMachineByID(id int) (*domain.MachineDetail, err
 	}
 	var row machineRow
 	err := s.db.Get(&row, `
-		SELECT id, hashed_pkey, client_id, ip_address, last_seen,
-		       COALESCE(geo, '{}'::jsonb) AS geo,
-		       COALESCE(auth_decoded, '{}'::jsonb) AS auth_decoded
-		FROM machines WHERE id = $1`, id)
+		SELECT m.id, m.hashed_pkey, m.client_id, m.mac_address, m.ip_address, m.last_seen,
+		       COALESCE(m.geo, '{}'::jsonb) AS geo,
+		       COALESCE(m.auth_decoded, '{}'::jsonb) AS auth_decoded,
+		       gs.eth1_mac
+		FROM machines m
+		LEFT JOIN LATERAL (
+			SELECT eth1_mac FROM gateway_sessions
+			WHERE machine_id = m.id AND eth1_mac IS NOT NULL AND eth1_mac <> ''
+			ORDER BY last_seen DESC NULLS LAST
+			LIMIT 1
+		) gs ON true
+		WHERE m.id = $1`, id)
 	if err != nil {
 		return nil, err
 	}
 	d := &domain.MachineDetail{
-		ID:      row.ID,
-		NoSerie: machineDisplaySerie(row.ClientID, row.HashedPkey),
-		IP:      derefString(row.IPAddress, "-"),
+		ID:         row.ID,
+		NoSerie:    machineDisplaySerie(row.ClientID, row.HashedPkey),
+		MacAddress: resolveMachineMAC(row.MacAddress, row.Eth1MAC),
+		IP:         derefString(row.IPAddress, "-"),
 	}
 	if row.LastSeen != nil {
 		d.LastSeen = *row.LastSeen
@@ -150,6 +170,36 @@ func (s *AdminInventoryStore) GetGateways() ([]*domain.GatewayStatus, error) {
 		list = append(list, gw)
 	}
 	return list, nil
+}
+
+func resolveMachineMAC(stored, eth1 *string) string {
+	if mac := derefString(stored, ""); mac != "" {
+		return mac
+	}
+	return derefString(eth1, "")
+}
+
+func (s *AdminInventoryStore) backfillMissingMACs(list []*domain.MachineDetail) {
+	for _, d := range list {
+		if d.MacAddress != "" {
+			continue
+		}
+		keys := []string{d.NoSerie, fmt.Sprintf("%d", d.ID)}
+		for _, key := range keys {
+			if key == "" {
+				continue
+			}
+			var ekJSON json.RawMessage
+			if err := s.db.Get(&ekJSON, `SELECT ek FROM machine_telemetry WHERE client_id = $1`, key); err != nil {
+				continue
+			}
+			if mac := ParseMACFromTelemetryJSON(ekJSON); mac != "" {
+				d.MacAddress = mac
+				_, _ = s.db.Exec(`UPDATE machines SET mac_address = $2 WHERE id = $1`, d.ID, mac)
+				break
+			}
+		}
+	}
 }
 
 func derefString(p *string, fallback string) string {

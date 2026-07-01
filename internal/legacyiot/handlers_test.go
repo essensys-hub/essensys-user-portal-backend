@@ -21,13 +21,18 @@ func TestMyActionsReturnsEmptyActionsList(t *testing.T) {
 
 func TestServerInfos(t *testing.T) {
 	h := NewHandlers(nil, nil)
-	req := httptest.NewRequest(http.MethodGet, "/api/serverinfos", nil)
-	rec := httptest.NewRecorder()
-	h.ServerInfos(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
+	for i := 0; i < 4; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/api/serverinfos", nil)
+		rec := httptest.NewRecorder()
+		h.ServerInfos(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("poll %d: expected 200, got %d", i, rec.Code)
+		}
 	}
-	if len(serverInfoIndices()) > 30 {
-		t.Fatalf("serverinfos must have ≤30 indices for firmware, got %d", len(serverInfoIndices()))
+	r := NewInfoRotator()
+	for i := 0; i < 4; i++ {
+		if len(r.Next()) > 30 {
+			t.Fatalf("poll %d exceeds firmware limit", i)
+		}
 	}
 }

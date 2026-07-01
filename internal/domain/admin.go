@@ -15,6 +15,7 @@ type AdminStatsResponse struct {
 type MachineDetail struct {
 	ID          int       `json:"id"`
 	NoSerie     string    `json:"no_serie"`
+	MacAddress  string    `json:"mac_address"`
 	IP          string    `json:"ip"`
 	LastSeen    time.Time `json:"last_seen"`
 	RawAuth     string    `json:"raw_auth"`

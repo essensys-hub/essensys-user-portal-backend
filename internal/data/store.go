@@ -85,6 +85,46 @@ func (s *PortalStore) ListLinkRequestsByStatus(ctx context.Context, status strin
 	return rows, err
 }
 
+// ListLinkRequestsAdmin returns link requests for admin UI.
+// filter: "pending" (FIFO), "history" (approved/rejected, newest first), or "all".
+func (s *PortalStore) ListLinkRequestsAdmin(ctx context.Context, filter string, limit int) ([]domain.LinkRequestAdminView, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	base := `
+		SELECT lr.id, lr.user_id, lr.machine_serial, lr.message, lr.status,
+		       lr.reviewed_by, lr.reviewed_at, lr.created_at,
+		       u.email AS user_email, u.first_name, u.last_name
+		FROM link_requests lr
+		JOIN users u ON u.id = lr.user_id`
+	var query string
+	switch filter {
+	case "history":
+		query = base + `
+		WHERE lr.status IN ($2, $3)
+		ORDER BY COALESCE(lr.reviewed_at, lr.created_at) DESC
+		LIMIT $1`
+		var rows []domain.LinkRequestAdminView
+		err := s.db.SelectContext(ctx, &rows, query, limit, domain.LinkStatusApproved, domain.LinkStatusRejected)
+		return rows, err
+	case "all":
+		query = base + `
+		ORDER BY lr.created_at DESC
+		LIMIT $1`
+	default:
+		query = base + `
+		WHERE lr.status = $2
+		ORDER BY lr.created_at ASC
+		LIMIT $1`
+		var rows []domain.LinkRequestAdminView
+		err := s.db.SelectContext(ctx, &rows, query, limit, domain.LinkStatusPending)
+		return rows, err
+	}
+	var rows []domain.LinkRequestAdminView
+	err := s.db.SelectContext(ctx, &rows, query, limit)
+	return rows, err
+}
+
 func (s *PortalStore) UpdateLinkRequestStatus(ctx context.Context, id int, status, reviewer string) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE link_requests SET status = $1, reviewed_by = $2, reviewed_at = NOW() WHERE id = $3`,

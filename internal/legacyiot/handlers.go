@@ -15,33 +15,29 @@ import (
 )
 
 type Handlers struct {
-	store  *data.LegacyIoTStore
-	portal *data.PortalStore
+	store       *data.LegacyIoTStore
+	portal      *data.PortalStore
+	infoRotator *InfoRotator
 }
 
 func NewHandlers(store *data.LegacyIoTStore, portal *data.PortalStore) *Handlers {
-	return &Handlers{store: store, portal: portal}
-}
-
-// serverInfoIndices matches essensys-server-backend GetServerInfos (mystatus poll list).
-func serverInfoIndices() []int {
-	indices := []int{613, 607, 615, 590, 349, 350, 351, 352, 363, 425, 426, 920,
-		566, 567, 568, 569, 570, 571, 572,
-		574, 575, 576, 577, 578,
-		582, 583, 584, 585}
-	// Planning chauffage (13–348) : NE PAS lister ici. Le firmware BP_MQX_ETH (099-37)
-	// accepte au maximum 30 indices dans serverinfos (Json.c → ERREUR_INFOS_NB_VALEURS_MAX).
-	// Au-delà, le cycle Ethernet s'arrête après GET serverinfos : pas de mystatus ni myactions.
-	// Écriture planning : POST /api/portal/inject/batch (≤30 params/action). Lecture UI : exchange.
-	return indices
+	return &Handlers{
+		store:       store,
+		portal:      portal,
+		infoRotator: NewInfoRotator(),
+	}
 }
 
 func (h *Handlers) ServerInfos(w http.ResponseWriter, r *http.Request) {
 	clientID, _ := r.Context().Value(middleware.LegacyClientIDKey).(string)
-	log.Printf("[legacyiot] ServerInfos by %s", clientID)
+	indices := DefaultCommandIndices
+	if h.infoRotator != nil {
+		indices = h.infoRotator.Next()
+	}
+	log.Printf("[legacyiot] ServerInfos by %s (%d indices)", clientID, len(indices))
 	writeJSON(w, http.StatusOK, domain.ServerInfosResponse{
 		IsConnected: true,
-		Infos:       serverInfoIndices(),
+		Infos:       indices,
 		NewVersion:  "no",
 	})
 }

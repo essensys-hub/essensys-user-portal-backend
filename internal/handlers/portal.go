@@ -315,13 +315,23 @@ func (h *Handler) InjectBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPendingLinkRequests(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.store.ListLinkRequestsByStatus(r.Context(), domain.LinkStatusPending)
+	filter := r.URL.Query().Get("status")
+	if filter == "" {
+		filter = "pending"
+	}
+	switch filter {
+	case "pending", "history", "all":
+	default:
+		http.Error(w, "Invalid status filter (pending, history, all)", http.StatusBadRequest)
+		return
+	}
+	rows, err := h.store.ListLinkRequestsAdmin(r.Context(), filter, 100)
 	if err != nil {
 		http.Error(w, "List failed", http.StatusInternalServerError)
 		return
 	}
 	if rows == nil {
-		rows = []domain.LinkRequest{}
+		rows = []domain.LinkRequestAdminView{}
 	}
 	writeJSON(w, http.StatusOK, rows)
 }

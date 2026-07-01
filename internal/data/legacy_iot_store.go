@@ -95,7 +95,28 @@ func (s *LegacyIoTStore) SaveClientData(clientID, version string, ek []domain.Ex
 			version = EXCLUDED.version,
 			ek = EXCLUDED.ek,
 			updated_at = NOW()`, clientID, version, string(ekJSON))
-	return err
+	if err != nil {
+		return err
+	}
+	if mac := ParseMACFromEK(ek); mac != "" {
+		s.persistMachineMAC(clientID, mac)
+	}
+	return nil
+}
+
+func (s *LegacyIoTStore) persistMachineMAC(clientID, mac string) {
+	if mac == "" || clientID == "" {
+		return
+	}
+	hashPrefix := unknownHashPrefix(clientID)
+	_, err := s.db.Exec(`
+		UPDATE machines SET mac_address = $2
+		WHERE (client_id = $1 OR id::text = $1 OR ($3 <> '' AND hashed_pkey LIKE $3 || '%'))
+		  AND (mac_address IS NULL OR mac_address = '' OR mac_address = $2)`,
+		clientID, mac, hashPrefix)
+	if err != nil {
+		log.Printf("[legacyiot] persist mac for %s: %v", clientID, err)
+	}
 }
 
 func (s *LegacyIoTStore) SaveGateway(gw *domain.GatewayStatus) error {

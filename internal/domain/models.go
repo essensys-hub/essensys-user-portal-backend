@@ -13,6 +13,14 @@ type LinkRequest struct {
 	CreatedAt     time.Time  `db:"created_at" json:"created_at"`
 }
 
+// LinkRequestAdminView enriches LinkRequest for the admin UI (user identity).
+type LinkRequestAdminView struct {
+	LinkRequest
+	UserEmail string `db:"user_email" json:"user_email"`
+	FirstName string `db:"first_name" json:"first_name,omitempty"`
+	LastName  string `db:"last_name" json:"last_name,omitempty"`
+}
+
 type CloudAction struct {
 	GUID      string      `db:"guid" json:"guid"`
 	UserID    int         `db:"user_id" json:"user_id"`
