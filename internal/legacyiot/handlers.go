@@ -61,9 +61,10 @@ func (h *Handlers) MyStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
+	hashedPkey, _ := r.Context().Value(middleware.LegacyHashedPkeyKey).(string)
 	log.Printf("[legacyiot] MyStatus from %s ver=%s keys=%d", clientID, payload.Version, len(payload.EK))
 	if h.store != nil {
-		if err := h.store.SaveClientData(clientID, payload.Version, payload.EK); err != nil {
+		if err := h.store.SaveClientData(clientID, hashedPkey, payload.Version, payload.EK); err != nil {
 			log.Printf("[legacyiot] save telemetry: %v", err)
 		}
 	}

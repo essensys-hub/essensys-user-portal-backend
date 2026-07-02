@@ -91,7 +91,7 @@ func (s *AdminInventoryStore) GetMachines() ([]*domain.MachineDetail, error) {
 		}
 		list = append(list, d)
 	}
-	s.backfillMissingMACs(list)
+	s.backfillMissingMACs(rows, list)
 	return list, nil
 }
 
@@ -179,12 +179,18 @@ func resolveMachineMAC(stored, eth1 *string) string {
 	return derefString(eth1, "")
 }
 
-func (s *AdminInventoryStore) backfillMissingMACs(list []*domain.MachineDetail) {
-	for _, d := range list {
+func (s *AdminInventoryStore) backfillMissingMACs(rows []machineRow, list []*domain.MachineDetail) {
+	for i, d := range list {
 		if d.MacAddress != "" {
 			continue
 		}
-		keys := []string{d.NoSerie, fmt.Sprintf("%d", d.ID)}
+		row := rows[i]
+		keys := []string{
+			d.NoSerie,
+			fmt.Sprintf("%d", d.ID),
+			derefString(row.ClientID, ""),
+			row.HashedPkey,
+		}
 		for _, key := range keys {
 			if key == "" {
 				continue

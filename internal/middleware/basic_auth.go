@@ -81,9 +81,10 @@ func BasicAuth(store LegacyMachineStore, strict bool) func(http.Handler) http.Ha
 
 			if !machine.IsActive {
 				if !strict {
-					log.Printf("BasicAuth (Lax): machine %s inactive, anonymous", machine.NoSerie)
-					ctx := context.WithValue(r.Context(), LegacyClientIDKey, "anonymous")
-					ctx = context.WithValue(ctx, LegacyHashedPkeyKey, "")
+					// Inactive armoires still poll serverinfos/mystatus for inventory (MAC, telemetry).
+					log.Printf("BasicAuth (Lax): machine %s inactive, telemetry only", machine.NoSerie)
+					ctx := context.WithValue(r.Context(), LegacyClientIDKey, machine.NoSerie)
+					ctx = context.WithValue(ctx, LegacyHashedPkeyKey, hashedPkey)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}

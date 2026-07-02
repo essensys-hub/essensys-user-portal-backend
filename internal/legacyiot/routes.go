@@ -14,7 +14,6 @@ func Mount(r chi.Router, store *data.LegacyIoTStore, portal *data.PortalStore) {
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.BasicAuth(store, true))
-		r.Post("/mystatus", h.MyStatus)
 		r.Get("/myactions", h.MyActions)
 		r.Post("/done/{guid}", h.Done)
 	})
@@ -22,6 +21,7 @@ func Mount(r chi.Router, store *data.LegacyIoTStore, portal *data.PortalStore) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.BasicAuth(store, false))
 		r.Get("/serverinfos", h.ServerInfos)
+		r.Post("/mystatus", h.MyStatus)
 		r.Post("/infos", h.GatewayInfos)
 	})
 }

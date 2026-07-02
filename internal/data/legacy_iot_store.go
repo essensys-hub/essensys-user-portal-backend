@@ -83,7 +83,7 @@ func (s *LegacyIoTStore) UpdateMachineStatus(hashedPkey, ip, rawAuth, rawDecoded
 	}
 }
 
-func (s *LegacyIoTStore) SaveClientData(clientID, version string, ek []domain.ExchangeKeyValue) error {
+func (s *LegacyIoTStore) SaveClientData(clientID, hashedPkey, version string, ek []domain.ExchangeKeyValue) error {
 	ekJSON, err := json.Marshal(ek)
 	if err != nil {
 		return err
@@ -99,21 +99,24 @@ func (s *LegacyIoTStore) SaveClientData(clientID, version string, ek []domain.Ex
 		return err
 	}
 	if mac := ParseMACFromEK(ek); mac != "" {
-		s.persistMachineMAC(clientID, mac)
+		s.persistMachineMAC(clientID, hashedPkey, mac)
 	}
 	return nil
 }
 
-func (s *LegacyIoTStore) persistMachineMAC(clientID, mac string) {
-	if mac == "" || clientID == "" {
+func (s *LegacyIoTStore) persistMachineMAC(clientID, hashedPkey, mac string) {
+	if mac == "" {
 		return
 	}
 	hashPrefix := unknownHashPrefix(clientID)
 	_, err := s.db.Exec(`
 		UPDATE machines SET mac_address = $2
-		WHERE (client_id = $1 OR id::text = $1 OR ($3 <> '' AND hashed_pkey LIKE $3 || '%'))
+		WHERE (($1 <> '' AND client_id = $1)
+		    OR ($1 <> '' AND id::text = $1)
+		    OR ($3 <> '' AND hashed_pkey LIKE $3 || '%')
+		    OR ($4 <> '' AND hashed_pkey = $4))
 		  AND (mac_address IS NULL OR mac_address = '' OR mac_address = $2)`,
-		clientID, mac, hashPrefix)
+		clientID, mac, hashPrefix, hashedPkey)
 	if err != nil {
 		log.Printf("[legacyiot] persist mac for %s: %v", clientID, err)
 	}
