@@ -43,7 +43,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 		gw.Mount(r, h, store)
 
 		if cfg.ConsolidatedMode {
-			identity.Mount(r, users)
+			identity.Mount(r, users, cfg)
 			admin.Mount(r, admin.Deps{
 				Users:     users,
 				Audit:     audit,
