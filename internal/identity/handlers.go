@@ -18,14 +18,31 @@ type Handlers struct {
 	users             *data.UserStore
 	turnstile         turnstile.Verifier
 	turnstileEnforced bool
+	resets            *data.PasswordResetStore
+	audit             *data.AuditStore
 }
 
-func NewHandlers(users *data.UserStore, verifier turnstile.Verifier, turnstileEnforced bool) *Handlers {
-	return &Handlers{
+// Option keeps NewHandlers backward compatible as dependencies accrue.
+type Option func(*Handlers)
+
+func WithPasswordResets(resets *data.PasswordResetStore) Option {
+	return func(h *Handlers) { h.resets = resets }
+}
+
+func WithAudit(audit *data.AuditStore) Option {
+	return func(h *Handlers) { h.audit = audit }
+}
+
+func NewHandlers(users *data.UserStore, verifier turnstile.Verifier, turnstileEnforced bool, opts ...Option) *Handlers {
+	h := &Handlers{
 		users:             users,
 		turnstile:         verifier,
 		turnstileEnforced: turnstileEnforced,
 	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {

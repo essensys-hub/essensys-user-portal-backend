@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Mount(r chi.Router, users *data.UserStore, cfg config.Config) {
+func Mount(r chi.Router, users *data.UserStore, cfg config.Config, opts ...Option) {
 	if users == nil {
 		return
 	}
@@ -23,7 +23,7 @@ func Mount(r chi.Router, users *data.UserStore, cfg config.Config) {
 	if strings.TrimSpace(cfg.TurnstileSecretKey) != "" {
 		verifier = turnstile.NewClient(cfg.TurnstileSecretKey)
 	}
-	h := NewHandlers(users, verifier, cfg.TurnstileEnforced())
+	h := NewHandlers(users, verifier, cfg.TurnstileEnforced(), opts...)
 
 	limit := cfg.RegisterRateLimit
 	if limit <= 0 {
@@ -35,8 +35,12 @@ func Mount(r chi.Router, users *data.UserStore, cfg config.Config) {
 	}
 	registerLimiter := middleware.NewRateLimiter(limit, window)
 
+	resetLimiter := middleware.NewRateLimiter(10, time.Hour)
+
 	r.With(registerRateLimitMiddleware(registerLimiter)).Post("/auth/register", h.Register)
 	r.Post("/auth/login", h.Login)
+	r.Get("/auth/password/reset/validate", h.ValidateResetToken)
+	r.With(resetRateLimitMiddleware(resetLimiter)).Post("/auth/password/reset", h.ResetPassword)
 	r.Post("/auth/logout", h.Logout)
 	r.Get("/auth/google/login", h.GoogleLogin)
 	r.Get("/auth/google/callback", h.GoogleCallback)
@@ -61,6 +65,22 @@ func registerRateLimitMiddleware(rl *middleware.RateLimiter) func(http.Handler) 
 				log.Printf("audit action=REGISTER_BLOCKED_RATELIMIT ip=%s", ip)
 				writeJSON(w, http.StatusTooManyRequests, map[string]string{
 					"message": "Too many registration attempts. Please try again later.",
+				})
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func resetRateLimitMiddleware(rl *middleware.RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := middleware.ClientIP(r)
+			if !rl.Allow(ip) {
+				log.Printf("audit action=PASSWORD_RESET_BLOCKED_RATELIMIT ip=%s", ip)
+				writeJSON(w, http.StatusTooManyRequests, map[string]string{
+					"message": "Trop de tentatives. Merci de réessayer plus tard.",
 				})
 				return
 			}

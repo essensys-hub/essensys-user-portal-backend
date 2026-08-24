@@ -29,6 +29,12 @@ func (h *Handlers) tryAutoSend(slug string, user *domain.User, tempPassword stri
 }
 
 func (h *Handlers) sendTemplateEmail(slug string, user *domain.User, tempPassword string, adminID int, adminEmail, ip string, requireEnabled bool) sendResult {
+	return h.sendTemplateEmailWithVars(slug, user, tempPassword, nil, adminID, adminEmail, ip, requireEnabled)
+}
+
+// sendTemplateEmailWithVars adds template variables that only one slug needs,
+// such as the reset link, without widening buildTemplateVars for everyone.
+func (h *Handlers) sendTemplateEmailWithVars(slug string, user *domain.User, tempPassword string, extra notify.TemplateVars, adminID int, adminEmail, ip string, requireEnabled bool) sendResult {
 	if h.templates == nil || user == nil {
 		return sendResult{Err: fmt.Errorf("email service unavailable")}
 	}
@@ -51,6 +57,9 @@ func (h *Handlers) sendTemplateEmail(slug string, user *domain.User, tempPasswor
 	}
 
 	vars := h.buildTemplateVars(user, pwd)
+	for k, v := range extra {
+		vars[k] = v
+	}
 	subject := notify.Render(tpl.Subject, vars)
 	body := notify.Render(tpl.BodyHTML, vars)
 	if body == "" && tpl.BodyText != "" {

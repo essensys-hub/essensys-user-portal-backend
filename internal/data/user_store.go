@@ -98,6 +98,14 @@ func (s *UserStore) UpdateUser(userID int, firstName, lastName, passwordHash str
 	return err
 }
 
+// UpdatePasswordHash touches only the credential. UpdateUser would force the
+// caller to re-send first and last name, which risks clobbering a concurrent
+// profile edit with stale values.
+func (s *UserStore) UpdatePasswordHash(userID int, passwordHash string) error {
+	_, err := s.db.Exec(`UPDATE users SET password_hash = $1 WHERE id = $2`, passwordHash, userID)
+	return err
+}
+
 func (s *UserStore) DeleteUser(userID int) error {
 	_, err := s.db.Exec(`DELETE FROM users WHERE id = $1`, userID)
 	return err

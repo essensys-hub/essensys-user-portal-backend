@@ -24,6 +24,7 @@ type Handlers struct {
 	news      *data.NewsletterStore
 	templates *data.EmailTemplateStore
 	portal    *data.PortalStore
+	resets    *data.PasswordResetStore
 }
 
 type Deps struct {
@@ -34,6 +35,7 @@ type Deps struct {
 	News      *data.NewsletterStore
 	Templates *data.EmailTemplateStore
 	Portal    *data.PortalStore
+	Resets    *data.PasswordResetStore
 }
 
 func NewHandlers(d Deps) *Handlers {
@@ -45,6 +47,7 @@ func NewHandlers(d Deps) *Handlers {
 		news:      d.News,
 		templates: d.Templates,
 		portal:    d.Portal,
+		resets:    d.Resets,
 	}
 }
 

@@ -36,6 +36,7 @@ func Mount(r chi.Router, d Deps) {
 		r.Post("/admin/users/{id}/unforbid", h.UnforbidUser)
 		r.Delete("/admin/users/{id}", h.DeleteUser)
 		r.Post("/admin/users/{id}/resend-email", h.ResendUserEmail)
+		r.Post("/admin/users/{id}/password-reset", h.SendPasswordReset)
 		r.Get("/admin/email/health", h.EmailHealth)
 		r.Get("/admin/email-templates", h.ListEmailTemplates)
 		r.Get("/admin/email-templates/{slug}", h.GetEmailTemplate)

@@ -18,7 +18,7 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
-func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
+func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, resets *data.PasswordResetStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
 	h := handlers.NewHandler(store, inventory, cfg.ExchangeStaleTTL)
 	r := chi.NewRouter()
 	r.Use(chimw.RealIP)
@@ -43,7 +43,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 		gw.Mount(r, h, store)
 
 		if cfg.ConsolidatedMode {
-			identity.Mount(r, users, cfg)
+			identity.Mount(r, users, cfg, identity.WithPasswordResets(resets), identity.WithAudit(audit))
 			admin.Mount(r, admin.Deps{
 				Users:     users,
 				Audit:     audit,
@@ -52,6 +52,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 				News:      news,
 				Templates: templates,
 				Portal:    store,
+				Resets:    resets,
 			})
 			legacyiot.Mount(r, iot, store)
 		}
