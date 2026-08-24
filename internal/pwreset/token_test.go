@@ -49,7 +49,7 @@ func TestBuildResetURL(t *testing.T) {
 	cases := []struct{ base, token, want string }{
 		{"https://mon.essensys.fr", "abc", "https://mon.essensys.fr/reset-password?token=abc"},
 		{"https://mon.essensys.fr/", "abc", "https://mon.essensys.fr/reset-password?token=abc"},
-		{"", "abc", "https://mon.essensys.fr/reset-password?token=abc"},
+		{"", "abc", "https://www.essensys.fr/reset-password?token=abc"},
 	}
 	for _, c := range cases {
 		if got := BuildResetURL(c.base, c.token); got != c.want {
@@ -68,7 +68,9 @@ func TestBuildResetURLEscapesToken(t *testing.T) {
 
 func TestPortalBaseURLFallsBackAndTrims(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "")
-	if got := PortalBaseURL(); got != "https://mon.essensys.fr" {
+	// The support-site origin, not the portal: /reset-password only exists in
+	// the former, and a link to the latter fails silently in the mailbox.
+	if got := PortalBaseURL(); got != "https://www.essensys.fr" {
 		t.Fatalf("fallback: got %q", got)
 	}
 	t.Setenv("FRONTEND_URL", "https://staging.essensys.fr/")

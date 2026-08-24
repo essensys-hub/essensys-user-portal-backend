@@ -10,9 +10,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,7 +25,11 @@ const TTL = 60 * time.Minute
 // MinPasswordLength matches the floor already applied at registration.
 const MinPasswordLength = 8
 
-const defaultPortalURL = "https://mon.essensys.fr"
+// defaultPortalURL is the support-site origin, which is where /reset-password is
+// served. mon.essensys.fr would look like the obvious choice but serves the
+// portal frontend, which has no such route, so a link built against it would 200
+// on the SPA fallback and then render nothing.
+const defaultPortalURL = "https://www.essensys.fr"
 
 // tokenBytes yields 256 bits of entropy, encoded to 43 URL-safe characters.
 const tokenBytes = 32
@@ -58,10 +64,17 @@ func Hash(plain string) string {
 func PortalBaseURL() string {
 	base := strings.TrimSpace(os.Getenv("FRONTEND_URL"))
 	if base == "" {
+		// A wrong host produces a link that fails only in the user's mailbox,
+		// where nobody is watching, so say so where someone is.
+		warnFallbackOnce.Do(func() {
+			log.Printf("[pwreset] FRONTEND_URL is unset, building reset links against %s", defaultPortalURL)
+		})
 		return defaultPortalURL
 	}
 	return strings.TrimRight(base, "/")
 }
+
+var warnFallbackOnce sync.Once
 
 func BuildResetURL(base, token string) string {
 	if base == "" {
