@@ -53,7 +53,7 @@ func (h *Handlers) SendPasswordReset(w http.ResponseWriter, r *http.Request) {
 		"Reset link issued for "+user.Email)
 
 	result := h.sendTemplateEmailWithVars(domain.EmailSlugPasswordReset, user, "", notify.TemplateVars{
-		"reset_url":  pwreset.BuildResetURL(pwreset.PortalBaseURL(), plain),
+		"reset_url":  pwreset.BuildResetURL(pwreset.ResetLinkBaseURL(), plain),
 		"expires_in": strconv.Itoa(pwreset.ExpiresInMinutes(expiresAt, time.Now())),
 		// Pinned empty so a template still carrying the old marker cannot fall
 		// back to the "contactez votre administrateur" filler mid-sentence.

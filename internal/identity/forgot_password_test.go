@@ -229,7 +229,7 @@ func TestForgotRejectsFailedCaptcha(t *testing.T) {
 }
 
 func TestResetVarsCarryTheLinkAndSuppressTheOldMarker(t *testing.T) {
-	t.Setenv("FRONTEND_URL", "https://www.essensys.fr/")
+	t.Setenv("PASSWORD_RESET_BASE_URL", "https://www.essensys.fr/")
 	h := NewHandlers(nil, &stubVerifier{}, false)
 	user := &domain.User{ID: 12, Email: "emilien@example.com", FirstName: "Emilien"}
 

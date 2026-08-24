@@ -25,11 +25,9 @@ const TTL = 60 * time.Minute
 // MinPasswordLength matches the floor already applied at registration.
 const MinPasswordLength = 8
 
-// defaultPortalURL is the support-site origin, which is where /reset-password is
-// served. mon.essensys.fr would look like the obvious choice but serves the
-// portal frontend, which has no such route, so a link built against it would 200
-// on the SPA fallback and then render nothing.
-const defaultPortalURL = "https://www.essensys.fr"
+// defaultResetOrigin is the support-site origin, which is where /reset-password
+// is served.
+const defaultResetOrigin = "https://www.essensys.fr"
 
 // tokenBytes yields 256 bits of entropy, encoded to 43 URL-safe characters.
 const tokenBytes = 32
@@ -59,26 +57,28 @@ func Hash(plain string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// PortalBaseURL mirrors the resolution already used for transactional email
-// variables, so a reset link and a welcome link never disagree on the host.
-func PortalBaseURL() string {
-	base := strings.TrimSpace(os.Getenv("FRONTEND_URL"))
-	if base == "" {
-		// A wrong host produces a link that fails only in the user's mailbox,
-		// where nobody is watching, so say so where someone is.
-		warnFallbackOnce.Do(func() {
-			log.Printf("[pwreset] FRONTEND_URL is unset, building reset links against %s", defaultPortalURL)
-		})
-		return defaultPortalURL
+// ResetLinkBaseURL returns the origin that serves /reset-password.
+//
+// Deliberately not FRONTEND_URL. That variable points at the portal SPA on
+// mon.essensys.fr, which has no /reset-password route: a link built from it
+// answers 200 through the SPA fallback and then renders nothing, a failure
+// visible only in the recipient's mailbox. The reset page belongs to the
+// support site, a different origin, so it gets its own variable.
+func ResetLinkBaseURL() string {
+	if base := strings.TrimSpace(os.Getenv("PASSWORD_RESET_BASE_URL")); base != "" {
+		return strings.TrimRight(base, "/")
 	}
-	return strings.TrimRight(base, "/")
+	logDefaultOnce.Do(func() {
+		log.Printf("[pwreset] PASSWORD_RESET_BASE_URL unset, building reset links against %s", defaultResetOrigin)
+	})
+	return defaultResetOrigin
 }
 
-var warnFallbackOnce sync.Once
+var logDefaultOnce sync.Once
 
 func BuildResetURL(base, token string) string {
 	if base == "" {
-		base = defaultPortalURL
+		base = defaultResetOrigin
 	}
 	return fmt.Sprintf("%s/reset-password?token=%s", strings.TrimRight(base, "/"), url.QueryEscape(token))
 }

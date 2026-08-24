@@ -141,7 +141,7 @@ func (h *Handlers) dispatchMail(user *domain.User, plain string, expiresAt time.
 
 func (h *Handlers) resetVars(user *domain.User, plain string, expiresAt time.Time) notify.TemplateVars {
 	vars := mailtpl.BaseUserVars(user)
-	vars["reset_url"] = pwreset.BuildResetURL(pwreset.PortalBaseURL(), plain)
+	vars["reset_url"] = pwreset.BuildResetURL(pwreset.ResetLinkBaseURL(), plain)
 	vars["expires_in"] = strconv.Itoa(pwreset.ExpiresInMinutes(expiresAt, time.Now()))
 	// Declared rather than left to notify.Render's placeholder stripping, so a
 	// template still carrying the pre-013 marker degrades to a blank instead of

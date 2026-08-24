@@ -66,16 +66,27 @@ func TestBuildResetURLEscapesToken(t *testing.T) {
 	}
 }
 
-func TestPortalBaseURLFallsBackAndTrims(t *testing.T) {
-	t.Setenv("FRONTEND_URL", "")
+func TestResetLinkBaseURLFallsBackAndTrims(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_BASE_URL", "")
 	// The support-site origin, not the portal: /reset-password only exists in
 	// the former, and a link to the latter fails silently in the mailbox.
-	if got := PortalBaseURL(); got != "https://www.essensys.fr" {
+	if got := ResetLinkBaseURL(); got != "https://www.essensys.fr" {
 		t.Fatalf("fallback: got %q", got)
 	}
-	t.Setenv("FRONTEND_URL", "https://staging.essensys.fr/")
-	if got := PortalBaseURL(); got != "https://staging.essensys.fr" {
+	t.Setenv("PASSWORD_RESET_BASE_URL", "https://staging.essensys.fr/")
+	if got := ResetLinkBaseURL(); got != "https://staging.essensys.fr" {
 		t.Fatalf("trim: got %q", got)
+	}
+}
+
+// FRONTEND_URL points at the portal in production. Deriving the reset link from
+// it is the regression this guards: the link 200s on the portal SPA fallback and
+// renders nothing, so it fails only where nobody is looking.
+func TestResetLinkIgnoresPortalFrontendURL(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_BASE_URL", "")
+	t.Setenv("FRONTEND_URL", "https://mon.essensys.fr/")
+	if got := ResetLinkBaseURL(); got != "https://www.essensys.fr" {
+		t.Fatalf("reset links must not follow FRONTEND_URL, got %q", got)
 	}
 }
 
