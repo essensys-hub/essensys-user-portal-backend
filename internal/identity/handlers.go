@@ -9,6 +9,7 @@ import (
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/turnstile"
 	"golang.org/x/crypto/bcrypt"
@@ -20,6 +21,10 @@ type Handlers struct {
 	turnstileEnforced bool
 	resets            *data.PasswordResetStore
 	audit             *data.AuditStore
+	mailer            *mailtpl.Sender
+	// dispatch runs background work. Tests replace it to observe the mail that
+	// the forgot flow would otherwise send from a goroutine that outlives them.
+	dispatch func(func())
 }
 
 // Option keeps NewHandlers backward compatible as dependencies accrue.
@@ -31,6 +36,10 @@ func WithPasswordResets(resets *data.PasswordResetStore) Option {
 
 func WithAudit(audit *data.AuditStore) Option {
 	return func(h *Handlers) { h.audit = audit }
+}
+
+func WithMailer(mailer *mailtpl.Sender) Option {
+	return func(h *Handlers) { h.mailer = mailer }
 }
 
 func NewHandlers(users *data.UserStore, verifier turnstile.Verifier, turnstileEnforced bool, opts ...Option) *Handlers {

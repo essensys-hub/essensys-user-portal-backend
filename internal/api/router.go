@@ -10,6 +10,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/handlers"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/identity"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/legacyiot"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/portal"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -43,7 +44,16 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 		gw.Mount(r, h, store)
 
 		if cfg.ConsolidatedMode {
-			identity.Mount(r, users, cfg, identity.WithPasswordResets(resets), identity.WithAudit(audit))
+			identityOpts := []identity.Option{
+				identity.WithPasswordResets(resets),
+				identity.WithAudit(audit),
+			}
+			// Without the mailer the forgot endpoint still issues tokens but
+			// nothing reaches the user, so only wire it when templates exist.
+			if templates != nil {
+				identityOpts = append(identityOpts, identity.WithMailer(mailtpl.NewSender(templates)))
+			}
+			identity.Mount(r, users, cfg, identityOpts...)
 			admin.Mount(r, admin.Deps{
 				Users:     users,
 				Audit:     audit,

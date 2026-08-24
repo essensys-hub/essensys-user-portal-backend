@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -24,11 +25,19 @@ func SampleTemplateVars() TemplateVars {
 	}
 }
 
-// Render replaces {{key}} placeholders using only keys present in vars.
+// placeholderPattern matches any remaining {{name}} marker after substitution.
+var placeholderPattern = regexp.MustCompile(`\{\{[a-zA-Z0-9_]+\}\}`)
+
+// Render replaces {{key}} placeholders using only keys present in vars, then
+// drops the markers no caller supplied.
+//
+// Leaving them in place printed "{{gateway_ip}}" into customer email whenever a
+// template outlived the code path that filled it — the failure mode was visible
+// only in the recipient's inbox.
 func Render(text string, vars TemplateVars) string {
 	out := text
 	for k, v := range vars {
 		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
 	}
-	return out
+	return placeholderPattern.ReplaceAllString(out, "")
 }

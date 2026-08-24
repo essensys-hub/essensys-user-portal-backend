@@ -56,7 +56,7 @@ func (h *Handlers) SendPasswordReset(w http.ResponseWriter, r *http.Request) {
 		"reset_url":  pwreset.BuildResetURL(pwreset.PortalBaseURL(), plain),
 		"expires_in": strconv.Itoa(pwreset.ExpiresInMinutes(expiresAt, time.Now())),
 		// Pinned empty so a template still carrying the old marker cannot fall
-		// back to the "contact your administrator" filler mid-sentence.
+		// back to the "contactez votre administrateur" filler mid-sentence.
 		"temporary_password": "",
 	}, admin.ID, admin.Email, ip, true)
 

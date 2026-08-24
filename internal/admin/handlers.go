@@ -11,6 +11,7 @@ import (
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -25,6 +26,7 @@ type Handlers struct {
 	templates *data.EmailTemplateStore
 	portal    *data.PortalStore
 	resets    *data.PasswordResetStore
+	mailer    *mailtpl.Sender
 }
 
 type Deps struct {
@@ -39,7 +41,7 @@ type Deps struct {
 }
 
 func NewHandlers(d Deps) *Handlers {
-	return &Handlers{
+	h := &Handlers{
 		users:     d.Users,
 		audit:     d.Audit,
 		inventory: d.Inventory,
@@ -49,6 +51,12 @@ func NewHandlers(d Deps) *Handlers {
 		portal:    d.Portal,
 		resets:    d.Resets,
 	}
+	// Guarded rather than assigned unconditionally: a nil *EmailTemplateStore
+	// stored in the interface would read as non-nil at the call site.
+	if d.Templates != nil {
+		h.mailer = mailtpl.NewSender(d.Templates)
+	}
+	return h
 }
 
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {

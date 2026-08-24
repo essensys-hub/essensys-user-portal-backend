@@ -2,11 +2,10 @@ package admin
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"strings"
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/notify"
 )
 
@@ -34,20 +33,16 @@ func (h *Handlers) sendTemplateEmail(slug string, user *domain.User, tempPasswor
 
 // sendTemplateEmailWithVars adds template variables that only one slug needs,
 // such as the reset link, without widening buildTemplateVars for everyone.
+//
+// Rendering and delivery live in mailtpl so the public reset flow can reuse
+// them; the audit entries stay here because only this package knows which
+// administrator is acting.
 func (h *Handlers) sendTemplateEmailWithVars(slug string, user *domain.User, tempPassword string, extra notify.TemplateVars, adminID int, adminEmail, ip string, requireEnabled bool) sendResult {
-	if h.templates == nil || user == nil {
+	if h.mailer == nil || h.templates == nil || user == nil {
 		return sendResult{Err: fmt.Errorf("email service unavailable")}
 	}
 	tpl, err := h.templates.Get(slug)
 	if err != nil {
-		return sendResult{Err: err}
-	}
-	if requireEnabled && !tpl.Enabled {
-		return sendResult{Err: fmt.Errorf("template %s is disabled", slug)}
-	}
-	if !notify.Configured() {
-		err := fmt.Errorf("SMTP configuration missing")
-		h.recordEmailFailure(user.Email, slug, err, adminID, adminEmail, ip)
 		return sendResult{Err: err}
 	}
 
@@ -60,65 +55,31 @@ func (h *Handlers) sendTemplateEmailWithVars(slug string, user *domain.User, tem
 	for k, v := range extra {
 		vars[k] = v
 	}
-	subject := notify.Render(tpl.Subject, vars)
-	body := notify.Render(tpl.BodyHTML, vars)
-	if body == "" && tpl.BodyText != "" {
-		body = "<pre>" + notify.Render(tpl.BodyText, vars) + "</pre>"
-	}
 
-	err = notify.Send([]string{user.Email}, subject, body)
 	adminPtr := &adminID
 	if adminID == 0 {
 		adminPtr = nil
 	}
-	if err != nil {
-		_ = h.templates.LogSend(user.Email, slug, "failed", err.Error(), adminPtr)
+	res := h.mailer.Send(slug, user.Email, vars, adminPtr, requireEnabled)
+	if res.Err != nil {
 		h.logAudit(adminID, adminEmail, "EMAIL_SEND_FAILED", "EMAIL", slug, ip,
 			fmt.Sprintf("to=%s template=%s", user.Email, slug))
-		log.Printf("[email] send %s to %s: %v", slug, user.Email, err)
-		return sendResult{Err: err}
+		return sendResult{Err: res.Err}
 	}
-	_ = h.templates.LogSend(user.Email, slug, "sent", "", adminPtr)
 	h.logAudit(adminID, adminEmail, "EMAIL_SENT", "EMAIL", slug, ip,
 		fmt.Sprintf("to=%s template=%s", user.Email, slug))
-	return sendResult{Sent: true}
-}
-
-func (h *Handlers) recordEmailFailure(recipient, slug string, err error, adminID int, adminEmail, ip string) {
-	adminPtr := &adminID
-	if adminID == 0 {
-		adminPtr = nil
-	}
-	_ = h.templates.LogSend(recipient, slug, "failed", err.Error(), adminPtr)
-	h.logAudit(adminID, adminEmail, "EMAIL_SEND_FAILED", "EMAIL", slug, ip,
-		fmt.Sprintf("to=%s template=%s", recipient, slug))
+	return sendResult{Sent: res.Sent}
 }
 
 func (h *Handlers) buildTemplateVars(user *domain.User, tempPassword string) notify.TemplateVars {
-	portalURL := os.Getenv("FRONTEND_URL")
-	if portalURL == "" {
-		portalURL = "https://mon.essensys.fr/"
-	}
-	support := os.Getenv("SMTP_FROM")
-	if support == "" {
-		support = "support@essensys.fr"
-	}
-	vars := notify.TemplateVars{
-		"first_name":         user.FirstName,
-		"last_name":          user.LastName,
-		"email":              user.Email,
-		"role":               user.Role,
-		"portal_url":         portalURL,
-		"temporary_password": tempPassword,
-		"support_email":      support,
-		"gateway_name":       "",
-		"gateway_ip":         "",
-		"armoire_label":      "",
-		"armoire_ip":         "",
-	}
-	if user.FirstName == "" {
-		vars["first_name"] = user.Email
-	}
+	vars := mailtpl.BaseUserVars(user)
+	vars["temporary_password"] = tempPassword
+	// Declared even when empty: notify.Render leaves unknown placeholders
+	// verbatim, so an unset device field would print {{gateway_ip}} to the user.
+	vars["gateway_name"] = ""
+	vars["gateway_ip"] = ""
+	vars["armoire_label"] = ""
+	vars["armoire_ip"] = ""
 	h.enrichDeviceVars(user, vars)
 	return vars
 }

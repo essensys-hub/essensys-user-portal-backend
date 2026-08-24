@@ -36,9 +36,13 @@ func Mount(r chi.Router, users *data.UserStore, cfg config.Config, opts ...Optio
 	registerLimiter := middleware.NewRateLimiter(limit, window)
 
 	resetLimiter := middleware.NewRateLimiter(10, time.Hour)
+	// Tighter than the consume limit: asking for a link mails a third party,
+	// whereas consuming one only ever affects the holder of the token.
+	forgotLimiter := middleware.NewRateLimiter(5, time.Hour)
 
 	r.With(registerRateLimitMiddleware(registerLimiter)).Post("/auth/register", h.Register)
 	r.Post("/auth/login", h.Login)
+	r.With(resetRateLimitMiddleware(forgotLimiter)).Post("/auth/password/forgot", h.ForgotPassword)
 	r.Get("/auth/password/reset/validate", h.ValidateResetToken)
 	r.With(resetRateLimitMiddleware(resetLimiter)).Post("/auth/password/reset", h.ResetPassword)
 	r.Post("/auth/logout", h.Logout)
