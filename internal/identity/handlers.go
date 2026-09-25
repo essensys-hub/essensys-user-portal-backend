@@ -154,6 +154,14 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	// Checked only after the password has already matched: testing this
+	// before the bcrypt comparison would let a caller who does not know the
+	// password distinguish "this account has an expired temporary password"
+	// from every other account, which the comparison itself never discloses.
+	if domain.TempPasswordExpired(user, time.Now()) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "temporary_password_expired"})
+		return
+	}
 
 	_ = h.users.UpdateLastLogin(user.ID)
 	token, err := middleware.GenerateJWT(user.Email, user.Role, time.Now().Add(24*time.Hour))
@@ -162,8 +170,9 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"token": token,
-		"user":  domain.UserToResponse(user),
+		"token":                    token,
+		"user":                     domain.UserToResponse(user),
+		"password_change_required": domain.PasswordChangeRequired(user),
 	})
 }
 
