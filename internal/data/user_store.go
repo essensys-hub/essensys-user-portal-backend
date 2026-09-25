@@ -38,6 +38,9 @@ func (s *UserStore) EnsureTableExists() error {
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS linked_gateway_id VARCHAR(255);
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS linked_armoire_id INT;
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS forbidden_at TIMESTAMPTZ NULL;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS password_change_required_at TIMESTAMPTZ NULL;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS temp_password_expires_at TIMESTAMPTZ NULL;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS temp_password_issued_by INT NULL REFERENCES users(id) ON DELETE SET NULL;
 	`
 	_, err := s.db.Exec(query)
 	return err

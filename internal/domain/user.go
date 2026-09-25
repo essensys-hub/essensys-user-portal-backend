@@ -29,6 +29,10 @@ type User struct {
 	LinkedMachineID *int       `db:"linked_machine_id" json:"linked_machine_id"`
 	LinkedGatewayID *string   `db:"linked_gateway_id" json:"linked_gateway_id"`
 	LinkedArmoireID *int      `db:"linked_armoire_id" json:"linked_armoire_id"`
+
+	PasswordChangeRequiredAt *time.Time `db:"password_change_required_at" json:"password_change_required_at,omitempty"`
+	TempPasswordExpiresAt    *time.Time `db:"temp_password_expires_at" json:"temp_password_expires_at,omitempty"`
+	TempPasswordIssuedBy     *int       `db:"temp_password_issued_by" json:"-"`
 }
 
 type RegisterRequest struct {
