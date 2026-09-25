@@ -167,3 +167,24 @@ func TestPasswordChangeRequired_BlocksEveryRouteFamily(t *testing.T) {
 		t.Fatalf("unmet expectations: %v", err)
 	}
 }
+
+// TestTemporaryPasswordRouteRegistered is the routing-level half of task
+// 4.3: without a valid Authorization header the request never reaches
+// IssueTemporaryPassword, so a 401 (rather than chi's 404 for an unmatched
+// route) is proof the route exists and is wired to AdminAuthWithStore.
+func TestTemporaryPasswordRouteRegistered(t *testing.T) {
+	t.Setenv("NEW_RELIC_ENABLED", "false")
+
+	cfg := config.Config{
+		ConsolidatedMode: true,
+		ExchangeStaleTTL: 120 * time.Second,
+		CORSOrigin:       "https://mon.essensys.fr",
+	}
+	handler := NewRouter(nil, &data.UserStore{}, nil, nil, nil, nil, nil, nil, nil, cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/users/12/temporary-password", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 (route exists, auth missing), got %d", rec.Code)
+	}
+}

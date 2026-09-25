@@ -175,7 +175,8 @@ func (s *UserStore) GetAllUsers() ([]*domain.User, error) {
 	var users []*domain.User
 	err := s.db.Select(&users, `
 		SELECT id, email, role, first_name, last_name, provider, created_at, last_login, forbidden_at,
-		       linked_machine_id, linked_gateway_id, linked_armoire_id
+		       linked_machine_id, linked_gateway_id, linked_armoire_id,
+		       password_change_required_at, temp_password_expires_at
 		FROM users ORDER BY created_at DESC`)
 	if users == nil {
 		users = []*domain.User{}
@@ -187,7 +188,8 @@ func (s *UserStore) GetUsersByMachineID(machineID int) ([]*domain.User, error) {
 	var users []*domain.User
 	err := s.db.Select(&users, `
 		SELECT id, email, role, first_name, last_name, provider, created_at, last_login, forbidden_at,
-		       linked_machine_id, linked_gateway_id, linked_armoire_id
+		       linked_machine_id, linked_gateway_id, linked_armoire_id,
+		       password_change_required_at, temp_password_expires_at
 		FROM users WHERE linked_machine_id = $1 ORDER BY created_at DESC`, machineID)
 	if users == nil {
 		users = []*domain.User{}
