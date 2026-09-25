@@ -136,6 +136,41 @@ func (s *UserStore) UpdateUserLinks(userID int, machineID *int, gatewayID *strin
 	return err
 }
 
+// SetTemporaryPassword installs an admin-issued temporary password: it
+// overwrites the credential and marks the account as needing a change in the
+// same statement, so the two can never be observed out of sync by a
+// concurrent read. issuedBy is the admin's user ID, recorded for audit
+// traceability (temp_password_issued_by), separate from audit_logs so it
+// survives even if the log entry is pruned.
+func (s *UserStore) SetTemporaryPassword(userID int, hash string, expiresAt time.Time, issuedBy int) error {
+	_, err := s.db.Exec(`
+		UPDATE users
+		SET password_hash = $1,
+		    password_change_required_at = NOW(),
+		    temp_password_expires_at = $2,
+		    temp_password_issued_by = $3
+		WHERE id = $4`,
+		hash, expiresAt, issuedBy, userID)
+	return err
+}
+
+// ClearPasswordChangeRequired installs the user's own new password and lifts
+// the forced-change lock in one statement: the account must never be
+// observably "changed" but still "required" (or vice versa), since either
+// gap would either strand the user behind the lock or leave a window where
+// the old temporary password briefly reads as still required.
+func (s *UserStore) ClearPasswordChangeRequired(userID int, hash string) error {
+	_, err := s.db.Exec(`
+		UPDATE users
+		SET password_hash = $1,
+		    password_change_required_at = NULL,
+		    temp_password_expires_at = NULL,
+		    temp_password_issued_by = NULL
+		WHERE id = $2`,
+		hash, userID)
+	return err
+}
+
 func (s *UserStore) GetAllUsers() ([]*domain.User, error) {
 	var users []*domain.User
 	err := s.db.Select(&users, `
