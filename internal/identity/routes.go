@@ -39,6 +39,9 @@ func Mount(r chi.Router, users *data.UserStore, cfg config.Config, opts ...Optio
 	// Tighter than the consume limit: asking for a link mails a third party,
 	// whereas consuming one only ever affects the holder of the token.
 	forgotLimiter := middleware.NewRateLimiter(5, time.Hour)
+	// Same shape as resetLimiter: this route only ever affects the caller's
+	// own account, so it gets the same generous ceiling.
+	changeLimiter := middleware.NewRateLimiter(10, time.Hour)
 
 	r.With(registerRateLimitMiddleware(registerLimiter)).Post("/auth/register", h.Register)
 	r.Post("/auth/login", h.Login)
@@ -59,6 +62,14 @@ func Mount(r chi.Router, users *data.UserStore, cfg config.Config, opts ...Optio
 		r.Put("/profile/links", h.UpdateProfileLinks)
 		r.Get("/devices/nearby", h.NearbyDevices)
 	})
+
+	// The one deliberate exemption from the password-change-required lock
+	// (D3): UserJWTAllowPasswordChange rather than UserJWTWithStore, so an
+	// account carrying a temporary password can reach this route and no
+	// other. Rate-limited before the JWT/DB work runs, same reasoning as the
+	// public routes above.
+	r.With(changePasswordRateLimitMiddleware(changeLimiter), middleware.UserJWTAllowPasswordChange(users)).
+		Post("/auth/password/change", h.ChangePassword)
 }
 
 func registerRateLimitMiddleware(rl *middleware.RateLimiter) func(http.Handler) http.Handler {
@@ -83,6 +94,22 @@ func resetRateLimitMiddleware(rl *middleware.RateLimiter) func(http.Handler) htt
 			ip := middleware.ClientIP(r)
 			if !rl.Allow(ip) {
 				log.Printf("audit action=PASSWORD_RESET_BLOCKED_RATELIMIT ip=%s", ip)
+				writeJSON(w, http.StatusTooManyRequests, map[string]string{
+					"message": "Trop de tentatives. Merci de réessayer plus tard.",
+				})
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func changePasswordRateLimitMiddleware(rl *middleware.RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := middleware.ClientIP(r)
+			if !rl.Allow(ip) {
+				log.Printf("audit action=PASSWORD_CHANGE_BLOCKED_RATELIMIT ip=%s", ip)
 				writeJSON(w, http.StatusTooManyRequests, map[string]string{
 					"message": "Trop de tentatives. Merci de réessayer plus tard.",
 				})

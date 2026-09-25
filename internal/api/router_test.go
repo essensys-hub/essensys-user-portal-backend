@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // userColumns mirrors domain.User's db tags. SELECT * scans by column name
@@ -186,5 +188,109 @@ func TestTemporaryPasswordRouteRegistered(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 (route exists, auth missing), got %d", rec.Code)
+	}
+}
+
+func userRowWithLock(email, hash string, changeRequiredAt, tempExpiresAt *time.Time) *sqlmock.Rows {
+	return sqlmock.NewRows(userColumns).AddRow(
+		1, email, hash, "user", "First", "Last",
+		"email", "", time.Now(), time.Now(), nil,
+		nil, nil, nil,
+		changeRequiredAt, tempExpiresAt, nil,
+	)
+}
+
+// TestPasswordChangeEndToEnd_SameTokenUnlocksAfterChange is task 5.4: it
+// proves the whole point of reloading the account on every request (D2) —
+// the JWT issued at login never changes, and yet the exact same token is
+// refused before the change and accepted after it, with no reissue in
+// between.
+func TestPasswordChangeEndToEnd_SameTokenUnlocksAfterChange(t *testing.T) {
+	t.Setenv("NEW_RELIC_ENABLED", "false")
+	t.Setenv("JWT_SECRET", "test-secret-key-1234567890123456")
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	users := data.NewUserStore(sqlx.NewDb(db, "sqlmock"))
+
+	tempHash, err := bcrypt.GenerateFromPassword([]byte("temp-password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := middleware.GenerateJWT("user@example.com", "user", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	changeRequiredAt := time.Now().Add(-time.Minute)
+	tempExpiresAt := time.Now().Add(71 * time.Hour)
+
+	cfg := config.Config{
+		ConsolidatedMode: true,
+		ExchangeStaleTTL: 120 * time.Second,
+		CORSOrigin:       "https://mon.essensys.fr",
+	}
+	handler := NewRouter(nil, users, nil, nil, nil, nil, nil, nil, nil, cfg)
+
+	// 1. Before the change: the lock blocks /api/profile outright, so the
+	// handler's own (redundant) GetUserByEmail is never reached.
+	mock.ExpectQuery(`SELECT \* FROM users WHERE email`).
+		WithArgs("user@example.com").
+		WillReturnRows(userRowWithLock("user@example.com", string(tempHash), &changeRequiredAt, &tempExpiresAt))
+
+	req1 := httptest.NewRequest(http.MethodGet, "/api/profile", nil)
+	req1.Header.Set("Authorization", "Bearer "+token)
+	rec1 := httptest.NewRecorder()
+	handler.ServeHTTP(rec1, req1)
+	if rec1.Code != http.StatusConflict {
+		t.Fatalf("before change: status = %d, want %d — body: %s", rec1.Code, http.StatusConflict, rec1.Body.String())
+	}
+
+	// 2. The change itself: UserJWTAllowPasswordChange loads the account once
+	// (still marked, still not forbidden), then ChangePassword loads it again
+	// to check the current password, then clears the lock.
+	mock.ExpectQuery(`SELECT \* FROM users WHERE email`).
+		WithArgs("user@example.com").
+		WillReturnRows(userRowWithLock("user@example.com", string(tempHash), &changeRequiredAt, &tempExpiresAt))
+	mock.ExpectQuery(`SELECT \* FROM users WHERE email`).
+		WithArgs("user@example.com").
+		WillReturnRows(userRowWithLock("user@example.com", string(tempHash), &changeRequiredAt, &tempExpiresAt))
+	mock.ExpectExec(`(?s)UPDATE users\s+SET password_hash = \$1,\s+password_change_required_at = NULL,\s+temp_password_expires_at = NULL,\s+temp_password_issued_by = NULL\s+WHERE id = \$2`).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	changeBody, _ := json.Marshal(map[string]string{
+		"current_password": "temp-password",
+		"new_password":     "brand-new-password",
+	})
+	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/password/change", bytes.NewReader(changeBody))
+	req2.Header.Set("Authorization", "Bearer "+token)
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("change request: status = %d, want %d — body: %s", rec2.Code, http.StatusOK, rec2.Body.String())
+	}
+
+	// 3. Same token, no reissue: the account now reads back clear, so the
+	// exact route that returned 409 in step 1 now succeeds.
+	mock.ExpectQuery(`SELECT \* FROM users WHERE email`).
+		WithArgs("user@example.com").
+		WillReturnRows(userRowWithLock("user@example.com", string(tempHash), nil, nil))
+	mock.ExpectQuery(`SELECT \* FROM users WHERE email`).
+		WithArgs("user@example.com").
+		WillReturnRows(userRowWithLock("user@example.com", string(tempHash), nil, nil))
+
+	req3 := httptest.NewRequest(http.MethodGet, "/api/profile", nil)
+	req3.Header.Set("Authorization", "Bearer "+token)
+	rec3 := httptest.NewRecorder()
+	handler.ServeHTTP(rec3, req3)
+	if rec3.Code != http.StatusOK {
+		t.Fatalf("after change: status = %d, want %d — body: %s", rec3.Code, http.StatusOK, rec3.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
 	}
 }
