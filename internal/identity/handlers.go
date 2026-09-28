@@ -9,6 +9,7 @@ import (
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/turnstile"
 	"golang.org/x/crypto/bcrypt"
@@ -18,14 +19,39 @@ type Handlers struct {
 	users             *data.UserStore
 	turnstile         turnstile.Verifier
 	turnstileEnforced bool
+	resets            *data.PasswordResetStore
+	audit             *data.AuditStore
+	mailer            *mailtpl.Sender
+	// dispatch runs background work. Tests replace it to observe the mail that
+	// the forgot flow would otherwise send from a goroutine that outlives them.
+	dispatch func(func())
 }
 
-func NewHandlers(users *data.UserStore, verifier turnstile.Verifier, turnstileEnforced bool) *Handlers {
-	return &Handlers{
+// Option keeps NewHandlers backward compatible as dependencies accrue.
+type Option func(*Handlers)
+
+func WithPasswordResets(resets *data.PasswordResetStore) Option {
+	return func(h *Handlers) { h.resets = resets }
+}
+
+func WithAudit(audit *data.AuditStore) Option {
+	return func(h *Handlers) { h.audit = audit }
+}
+
+func WithMailer(mailer *mailtpl.Sender) Option {
+	return func(h *Handlers) { h.mailer = mailer }
+}
+
+func NewHandlers(users *data.UserStore, verifier turnstile.Verifier, turnstileEnforced bool, opts ...Option) *Handlers {
+	h := &Handlers{
 		users:             users,
 		turnstile:         verifier,
 		turnstileEnforced: turnstileEnforced,
 	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +154,14 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	// Checked only after the password has already matched: testing this
+	// before the bcrypt comparison would let a caller who does not know the
+	// password distinguish "this account has an expired temporary password"
+	// from every other account, which the comparison itself never discloses.
+	if domain.TempPasswordExpired(user, time.Now()) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "temporary_password_expired"})
+		return
+	}
 
 	_ = h.users.UpdateLastLogin(user.ID)
 	token, err := middleware.GenerateJWT(user.Email, user.Role, time.Now().Add(24*time.Hour))
@@ -136,8 +170,9 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"token": token,
-		"user":  domain.UserToResponse(user),
+		"token":                    token,
+		"user":                     domain.UserToResponse(user),
+		"password_change_required": domain.PasswordChangeRequired(user),
 	})
 }
 

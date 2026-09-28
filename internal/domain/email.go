@@ -7,6 +7,7 @@ const (
 	EmailSlugDeviceAllocation  = "device_allocation"
 	EmailSlugPasswordReset     = "password_reset"
 	EmailSlugRoleUpdated       = "role_updated"
+	EmailSlugTemporaryPassword = "temporary_password"
 )
 
 type EmailTemplate struct {
