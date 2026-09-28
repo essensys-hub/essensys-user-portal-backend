@@ -29,13 +29,20 @@ type User struct {
 	LinkedMachineID *int       `db:"linked_machine_id" json:"linked_machine_id"`
 	LinkedGatewayID *string   `db:"linked_gateway_id" json:"linked_gateway_id"`
 	LinkedArmoireID *int      `db:"linked_armoire_id" json:"linked_armoire_id"`
+
+	PasswordChangeRequiredAt *time.Time `db:"password_change_required_at" json:"password_change_required_at,omitempty"`
+	TempPasswordExpiresAt    *time.Time `db:"temp_password_expires_at" json:"temp_password_expires_at,omitempty"`
+	TempPasswordIssuedBy     *int       `db:"temp_password_issued_by" json:"-"`
 }
 
 type RegisterRequest struct {
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	FirstName      string `json:"first_name"`
+	LastName       string `json:"last_name"`
+	TurnstileToken string `json:"turnstile_token"`
+	// Website is a honeypot; legitimate clients leave it empty.
+	Website string `json:"website"`
 }
 
 type LoginRequest struct {

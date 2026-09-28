@@ -10,6 +10,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/handlers"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/identity"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/legacyiot"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/portal"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -18,7 +19,7 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
-func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
+func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, resets *data.PasswordResetStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
 	h := handlers.NewHandler(store, inventory, cfg.ExchangeStaleTTL)
 	r := chi.NewRouter()
 	r.Use(chimw.RealIP)
@@ -43,7 +44,16 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 		gw.Mount(r, h, store)
 
 		if cfg.ConsolidatedMode {
-			identity.Mount(r, users)
+			identityOpts := []identity.Option{
+				identity.WithPasswordResets(resets),
+				identity.WithAudit(audit),
+			}
+			// Without the mailer the forgot endpoint still issues tokens but
+			// nothing reaches the user, so only wire it when templates exist.
+			if templates != nil {
+				identityOpts = append(identityOpts, identity.WithMailer(mailtpl.NewSender(templates)))
+			}
+			identity.Mount(r, users, cfg, identityOpts...)
 			admin.Mount(r, admin.Deps{
 				Users:     users,
 				Audit:     audit,
@@ -52,6 +62,7 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 				News:      news,
 				Templates: templates,
 				Portal:    store,
+				Resets:    resets,
 			})
 			legacyiot.Mount(r, iot, store)
 		}

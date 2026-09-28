@@ -2,47 +2,110 @@ package identity
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/turnstile"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Handlers struct {
-	users *data.UserStore
+	users             *data.UserStore
+	turnstile         turnstile.Verifier
+	turnstileEnforced bool
+	resets            *data.PasswordResetStore
+	audit             *data.AuditStore
+	mailer            *mailtpl.Sender
+	// dispatch runs background work. Tests replace it to observe the mail that
+	// the forgot flow would otherwise send from a goroutine that outlives them.
+	dispatch func(func())
 }
 
-func NewHandlers(users *data.UserStore) *Handlers {
-	return &Handlers{users: users}
+// Option keeps NewHandlers backward compatible as dependencies accrue.
+type Option func(*Handlers)
+
+func WithPasswordResets(resets *data.PasswordResetStore) Option {
+	return func(h *Handlers) { h.resets = resets }
+}
+
+func WithAudit(audit *data.AuditStore) Option {
+	return func(h *Handlers) { h.audit = audit }
+}
+
+func WithMailer(mailer *mailtpl.Sender) Option {
+	return func(h *Handlers) { h.mailer = mailer }
+}
+
+func NewHandlers(users *data.UserStore, verifier turnstile.Verifier, turnstileEnforced bool, opts ...Option) *Handlers {
+	h := &Handlers{
+		users:             users,
+		turnstile:         verifier,
+		turnstileEnforced: turnstileEnforced,
+	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	var req domain.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Invalid request body"})
 		return
 	}
 	if req.Email == "" || req.Password == "" {
-		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Email and password are required"})
 		return
+	}
+
+	ip := middleware.ClientIP(r)
+
+	// Honeypot: bots that fill hidden fields are rejected with a generic error.
+	if strings.TrimSpace(req.Website) != "" {
+		log.Printf("audit action=REGISTER_BLOCKED_HONEYPOT ip=%s", ip)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Invalid request"})
+		return
+	}
+
+	if h.turnstileEnforced {
+		token := strings.TrimSpace(req.TurnstileToken)
+		if token == "" {
+			log.Printf("audit action=REGISTER_BLOCKED_TURNSTILE ip=%s reason=missing_token", ip)
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Captcha verification required"})
+			return
+		}
+		if h.turnstile == nil {
+			log.Printf("audit action=REGISTER_BLOCKED_TURNSTILE ip=%s reason=not_configured", ip)
+			writeJSON(w, http.StatusForbidden, map[string]string{"message": "Captcha verification failed"})
+			return
+		}
+		if err := h.turnstile.Verify(r.Context(), token, ip); err != nil {
+			log.Printf("audit action=REGISTER_BLOCKED_TURNSTILE ip=%s reason=verify_failed", ip)
+			writeJSON(w, http.StatusForbidden, map[string]string{"message": "Captcha verification failed"})
+			return
+		}
 	}
 
 	existing, err := h.users.GetUserByEmail(req.Email)
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Database error"})
 		return
 	}
 	if existing != nil {
-		http.Error(w, "User already exists", http.StatusConflict)
+		writeJSON(w, http.StatusConflict, map[string]string{"message": "User already exists"})
 		return
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "Failed to process password", http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Failed to process password"})
 		return
 	}
 
@@ -57,7 +120,7 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		LastLogin:    time.Now(),
 	}
 	if err := h.users.CreateUser(user); err != nil {
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Failed to create user"})
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"message": "User registered successfully"})
@@ -91,6 +154,14 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	// Checked only after the password has already matched: testing this
+	// before the bcrypt comparison would let a caller who does not know the
+	// password distinguish "this account has an expired temporary password"
+	// from every other account, which the comparison itself never discloses.
+	if domain.TempPasswordExpired(user, time.Now()) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "temporary_password_expired"})
+		return
+	}
 
 	_ = h.users.UpdateLastLogin(user.ID)
 	token, err := middleware.GenerateJWT(user.Email, user.Role, time.Now().Add(24*time.Hour))
@@ -99,8 +170,9 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"token": token,
-		"user":  domain.UserToResponse(user),
+		"token":                    token,
+		"user":                     domain.UserToResponse(user),
+		"password_change_required": domain.PasswordChangeRequired(user),
 	})
 }
 
@@ -192,13 +264,6 @@ func (h *Handlers) NearbyDevices(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"machines": []any{},
 		"gateways": []any{},
-		"user_ip":  clientIP(r),
+		"user_ip":  middleware.ClientIP(r),
 	})
-}
-
-func clientIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		return fwd
-	}
-	return r.RemoteAddr
 }
