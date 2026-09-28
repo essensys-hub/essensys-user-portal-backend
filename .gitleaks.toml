@@ -33,6 +33,13 @@ paths = [
     '''^README\.md$''',
     '''^AGENTS\.md$''',
     '''^\.env\.example$''',
+    # Go test files: dummy JWT/admin-token literals passed to
+    # t.Setenv(...) so a test can exercise config.Validate()'s minimum-
+    # length check (>= 16 chars). Never deployed, never read outside the
+    # test binary. Same false-positive class as the pre-existing finding
+    # in internal/config/turnstile_test.go (TurnstileSecretKey dummy),
+    # triaged 2026-09-25 on PR #20.
+    '''_test\.go$''',
 ]
 
 regexes = [
