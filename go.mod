@@ -9,7 +9,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.12.3
-	github.com/newrelic/go-agent/v3 v3.44.1
+	github.com/newrelic/go-agent/v3 v3.44.2
 	github.com/newrelic/go-agent/v3/integrations/nrgochi v1.0.3
 	golang.org/x/crypto v0.57.0
 	golang.org/x/oauth2 v0.37.0
