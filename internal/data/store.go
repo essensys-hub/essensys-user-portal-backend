@@ -101,11 +101,12 @@ func (s *PortalStore) ListLinkRequestsAdmin(ctx context.Context, filter string, 
 	switch filter {
 	case "history":
 		query = base + `
-		WHERE lr.status IN ($2, $3)
+		WHERE lr.status IN ($2, $3, $4)
 		ORDER BY COALESCE(lr.reviewed_at, lr.created_at) DESC
 		LIMIT $1`
 		var rows []domain.LinkRequestAdminView
-		err := s.db.SelectContext(ctx, &rows, query, limit, domain.LinkStatusApproved, domain.LinkStatusRejected)
+		err := s.db.SelectContext(ctx, &rows, query, limit,
+			domain.LinkStatusApproved, domain.LinkStatusRejected, domain.LinkStatusRevoked)
 		return rows, err
 	case "all":
 		query = base + `
@@ -130,6 +131,22 @@ func (s *PortalStore) UpdateLinkRequestStatus(ctx context.Context, id int, statu
 		UPDATE link_requests SET status = $1, reviewed_by = $2, reviewed_at = NOW() WHERE id = $3`,
 		status, reviewer, id)
 	return err
+}
+
+// RevokeUserLinks marks every approved link request of the user owning
+// request id as revoked, so UserHasApprovedLink turns false and the user can
+// file a new request. Returns the number of requests revoked (0 when the
+// request does not exist or the user has no approved link).
+func (s *PortalStore) RevokeUserLinks(ctx context.Context, id int, reviewer string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE link_requests SET status = $1, reviewed_by = $2, reviewed_at = NOW()
+		WHERE status = $3
+		  AND user_id = (SELECT user_id FROM link_requests WHERE id = $4)`,
+		domain.LinkStatusRevoked, reviewer, domain.LinkStatusApproved, id)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func (s *PortalStore) UserHasApprovedLink(ctx context.Context, userID int) (bool, error) {
