@@ -13,6 +13,9 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 )
 
+// LabelToTriage marks a report as not yet reviewed by a maintainer.
+const LabelToTriage = "a-valider"
+
 const (
 	maxTitleLen = 120
 	maxTextLen  = 4000
@@ -195,13 +198,15 @@ func (s *Service) send(ctx context.Context, rep *data.SupportReport) error {
 		return err
 	}
 	in := IssueInput{
-		Title:  IssueTitle(rep.Kind, rep.Title),
-		Body:   IssueBody(rep.Kind, f, UserPseudonym(s.Settings.PseudonymKey, rep.UserID), rep.PublicRef),
-		Labels: []string{"bug", "via-portal"},
+		Title: IssueTitle(rep.Kind, rep.Title),
+		Body:  IssueBody(rep.Kind, f, UserPseudonym(s.Settings.PseudonymKey, rep.UserID), rep.PublicRef),
+		// a-valider : un mainteneur relit chaque signalement avant tout travail
+		// automatisé (report-triage-2026-10-005).
+		Labels: []string{"bug", "via-portal", LabelToTriage},
 		Type:   "Bug",
 	}
 	if rep.Kind == KindIncident {
-		in.Labels, in.Type = []string{"incident", "via-portal"}, "Support"
+		in.Labels, in.Type = []string{"incident", "via-portal", LabelToTriage}, "Support"
 	}
 	repo := s.repoFor(rep.Kind)
 	iss, err := s.GH.CreateIssue(ctx, repo, in)

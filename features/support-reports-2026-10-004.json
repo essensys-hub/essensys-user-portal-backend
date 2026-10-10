@@ -69,7 +69,8 @@
       "incident goes to private repo",
       "github down keeps pending",
       "create bug opens anonymised public issue",
-      "sensitive content is 422 without echo"
+      "sensitive content is 422 without echo",
+      "report is created a valider"
     ],
     "smoke_tags": [
       "@nr",
