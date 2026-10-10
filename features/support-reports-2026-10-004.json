@@ -2,7 +2,7 @@
   "$schema": "./schema/feature.schema.json",
   "id": "support-reports-2026-10-004",
   "title": "Signalement de bugs et d'incidents sans compte GitHub — backend",
-  "status": "in-progress",
+  "status": "archived",
   "owner": "nrineau",
   "github": {
     "issue": "essensys-hub/essensys-feature-lifecycle#15",
@@ -14,13 +14,13 @@
   },
   "openspec": {
     "change_id": "support-reports-2026-10-004",
-    "path": "../essensys-memory/openspec/changes/support-reports-2026-10-004",
-    "proposal": "../essensys-memory/openspec/changes/support-reports-2026-10-004/proposal.md",
-    "design": "../essensys-memory/openspec/changes/support-reports-2026-10-004/design.md",
-    "tasks": "../essensys-memory/openspec/changes/support-reports-2026-10-004/tasks.md",
+    "path": "../essensys-memory/openspec/changes/archive/2026-10-10-support-reports-2026-10-004",
+    "proposal": "../essensys-memory/openspec/changes/archive/2026-10-10-support-reports-2026-10-004/proposal.md",
+    "design": "../essensys-memory/openspec/changes/archive/2026-10-10-support-reports-2026-10-004/design.md",
+    "tasks": "../essensys-memory/openspec/changes/archive/2026-10-10-support-reports-2026-10-004/tasks.md",
     "specs": [
-      "../essensys-memory/openspec/changes/support-reports-2026-10-004/specs/support-report-submission/spec.md",
-      "../essensys-memory/openspec/changes/support-reports-2026-10-004/specs/support-report-tracking/spec.md"
+      "../essensys-memory/openspec/specs/support-report-submission/spec.md",
+      "../essensys-memory/openspec/specs/support-report-tracking/spec.md"
     ]
   },
   "implementation": {
@@ -104,7 +104,7 @@
       "last_scan_at": null
     },
     "muted_findings": [],
-    "threat_model_url": "../essensys-memory/openspec/changes/support-reports-2026-10-004/design.md",
+    "threat_model_url": "../essensys-memory/openspec/changes/archive/2026-10-10-support-reports-2026-10-004/design.md",
     "owner_security": "nrineau"
   }
 }
