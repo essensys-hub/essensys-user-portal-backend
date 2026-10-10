@@ -12,6 +12,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/legacyiot"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/portal"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/support"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -19,7 +20,23 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
-func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, resets *data.PasswordResetStore, nrApp *newrelic.Application, cfg config.Config) http.Handler {
+// Option adds an optional module to the router.
+type Option func(*routerOptions)
+
+type routerOptions struct {
+	support *support.Service
+}
+
+// WithSupport mounts /api/support/reports (consolidated mode only).
+func WithSupport(svc *support.Service) Option {
+	return func(o *routerOptions) { o.support = svc }
+}
+
+func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.AuditStore, inventory *data.AdminInventoryStore, news *data.NewsletterStore, templates *data.EmailTemplateStore, iot *data.LegacyIoTStore, resets *data.PasswordResetStore, nrApp *newrelic.Application, cfg config.Config, opts ...Option) http.Handler {
+	var o routerOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	h := handlers.NewHandler(store, inventory, cfg.ExchangeStaleTTL)
 	r := chi.NewRouter()
 	r.Use(chimw.RealIP)
@@ -65,6 +82,9 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 				Resets:    resets,
 			})
 			legacyiot.Mount(r, iot, store)
+			if o.support != nil {
+				support.Mount(r, users, o.support)
+			}
 		}
 	})
 

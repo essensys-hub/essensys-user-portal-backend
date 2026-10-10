@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from datetime import date
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
@@ -14,6 +16,8 @@ from jsonschema import Draft202012Validator
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCHEMA = REPO_ROOT / "features" / "schema" / "feature.schema.json"
 DEFAULT_FEATURES_DIR = REPO_ROOT / "features"
+# Fin de la fenêtre de compatibilité Jira/Confluence (change github-project-lifecycle-2026-10-001).
+JIRA_SUNSET = date.fromisoformat(os.environ.get("FEATURE_JIRA_SUNSET", "2026-11-09"))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,9 +60,10 @@ def load_json(path: Path) -> object:
 
 def validate_manifest(path: Path, validator: Draft202012Validator) -> dict[str, object]:
     result: dict[str, object] = {
-        "path": str(path.relative_to(REPO_ROOT)),
+        "path": str(path.relative_to(REPO_ROOT)) if path.is_relative_to(REPO_ROOT) else str(path),
         "ok": True,
         "errors": [],
+        "warnings": [],
     }
 
     if not path.exists():
@@ -81,6 +86,19 @@ def validate_manifest(path: Path, validator: Draft202012Validator) -> dict[str, 
             rendered.append(f"{location}: {error.message}")
         result["ok"] = False
         result["errors"] = rendered
+
+    if isinstance(payload, dict):
+        legacy = [key for key in ("jira", "confluence") if key in payload]
+        if legacy:
+            message = (
+                f"Legacy block(s) {', '.join(legacy)}: migrate to the 'github' block "
+                f"(GitHub Project essensys-hub #6) before {JIRA_SUNSET.isoformat()}."
+            )
+            if date.today() > JIRA_SUNSET:
+                result["ok"] = False
+                result["errors"].append(message)
+            else:
+                result["warnings"].append(message)
 
     return result
 
@@ -118,6 +136,8 @@ def main() -> int:
             print(f"[{prefix}] {result['path']}")
             for error in result["errors"]:
                 print(f"  - {error}")
+            for warning in result["warnings"]:
+                print(f"  ~ warning: {warning}")
 
     return 0 if ok else 1
 

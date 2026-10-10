@@ -47,6 +47,14 @@ func Load() Config {
 		TurnstileDisabled:   envBool("TURNSTILE_DISABLED", false),
 		RegisterRateLimit:   envInt("REGISTER_RATE_LIMIT", 5),
 		RegisterRateWindow:  envDurationSeconds("REGISTER_RATE_WINDOW_SECONDS", 3600),
+		SupportPseudonymKey: env("SUPPORT_PSEUDONYM_KEY", ""),
+		SupportPublicRepo:   env("SUPPORT_PUBLIC_REPO", "essensys-hub/essensys-support-site"),
+		SupportPrivateRepo:  env("SUPPORT_PRIVATE_REPO", "essensys-hub/essensys-support"),
+		SupportProjectID:    env("SUPPORT_PROJECT_ID", ""),
+		GitHubAppID:         env("GITHUB_APP_ID", ""),
+		GitHubInstallation:  env("GITHUB_APP_INSTALLATION_ID", ""),
+		GitHubAppKeyFile:    env("GITHUB_APP_PRIVATE_KEY_FILE", ""),
+		GitHubAPIURL:        env("GITHUB_API_URL", "https://api.github.com"),
 	}
 }
 
@@ -65,6 +73,13 @@ func (c Config) Validate() error {
 	}
 	if c.IsProduction() && c.ConsolidatedMode && strings.TrimSpace(c.TurnstileSecretKey) == "" {
 		return fmt.Errorf("TURNSTILE_SECRET_KEY is required when ENV=production and CONSOLIDATED_MODE=true")
+	}
+	// The U- reference of a support report must stay the same for an account
+	// from its very first report, so the key cannot be left to a default.
+	if c.IsProduction() && c.ConsolidatedMode {
+		if err := checkSecret("SUPPORT_PSEUDONYM_KEY", c.SupportPseudonymKey); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -115,6 +130,21 @@ type Config struct {
 	TurnstileDisabled  bool
 	RegisterRateLimit  int
 	RegisterRateWindow time.Duration
+	// Support reports (support-reports-2026-10-004). Without the three
+	// GitHub App settings, reports are accepted and stay pending.
+	SupportPseudonymKey string
+	SupportPublicRepo   string
+	SupportPrivateRepo  string
+	SupportProjectID    string
+	GitHubAppID         string
+	GitHubInstallation  string
+	GitHubAppKeyFile    string
+	GitHubAPIURL        string
+}
+
+// GitHubAppConfigured reports whether the support module can reach GitHub.
+func (c Config) GitHubAppConfigured() bool {
+	return c.GitHubAppID != "" && c.GitHubInstallation != "" && c.GitHubAppKeyFile != ""
 }
 
 func env(key, fallback string) string {
