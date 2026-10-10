@@ -1,10 +1,19 @@
 name: CI
 
+# Tests Go et rapport de non-régression (NR-backend-*).
+# Jamais d'armoire réelle : les tests simulent la base (sqlmock) et GitHub (httptest).
+
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  schedule:
+    - cron: "0 2 * * *" # nightly non-régression
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -14,6 +23,44 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
-      - run: go test ./...
+
+      - name: Tests unitaires (JUnit)
+        id: unit
+        continue-on-error: true
         env:
           GOTOOLCHAIN: auto
+        run: |
+          mkdir -p .artifacts
+          set -o pipefail
+          go test -v -count=1 ./... 2>&1 | tee .artifacts/go-test.log \
+            | go run github.com/jstemmer/go-junit-report/v2@v2.1.0 -set-exit-code > .artifacts/junit.xml
+
+      - name: Scripts lifecycle (rapport NR)
+        uses: actions/checkout@v7
+        with:
+          repository: essensys-hub/essensys-feature-lifecycle
+          ref: ${{ vars.LIFECYCLE_REF || 'main' }}
+          path: .lifecycle
+
+      - name: Rapport de non-régression
+        id: nonreg
+        run: |
+          set +e
+          python3 .lifecycle/scripts/feature_lifecycle/nonreg_report.py \
+            --sources internal \
+            --out .artifacts/nonreg.json --markdown .artifacts/nonreg.md \
+            .artifacts/junit.xml
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat .artifacts/nonreg.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: nonreg-report
+          path: .artifacts/
+          retention-days: 90
+
+      - name: Échec si tests ou rapport NR en erreur
+        run: |
+          if [ "${{ steps.unit.outcome }}" != "success" ]; then echo "Tests unitaires en échec"; exit 1; fi
+          if [ "${{ steps.nonreg.outputs.exit_code }}" != "0" ]; then echo "Rapport NR en erreur"; exit 1; fi

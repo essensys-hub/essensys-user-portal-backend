@@ -1,0 +1,109 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "support-reports-2026-10-004",
+  "title": "Signalement de bugs et d'incidents sans compte GitHub — backend",
+  "status": "in-progress",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#15",
+    "project_item": "PVTI_lADODqt0Wc4BavHTzg_1tE8"
+  },
+  "git": {
+    "branch": "feat/support-reports-2026-10-004",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "support-reports-2026-10-004",
+    "path": "../essensys-memory/openspec/changes/support-reports-2026-10-004",
+    "proposal": "../essensys-memory/openspec/changes/support-reports-2026-10-004/proposal.md",
+    "design": "../essensys-memory/openspec/changes/support-reports-2026-10-004/design.md",
+    "tasks": "../essensys-memory/openspec/changes/support-reports-2026-10-004/tasks.md",
+    "specs": [
+      "../essensys-memory/openspec/changes/support-reports-2026-10-004/specs/support-report-submission/spec.md",
+      "../essensys-memory/openspec/changes/support-reports-2026-10-004/specs/support-report-tracking/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "migrations/015_support_reports.sql",
+      "internal/data/support_report_store.go",
+      "internal/support/sensitive.go",
+      "internal/support/pseudonym.go",
+      "internal/support/render.go",
+      "internal/support/github.go",
+      "internal/support/service.go",
+      "internal/support/syncer.go",
+      "internal/support/routes.go",
+      "internal/config/config.go",
+      "internal/api/router.go",
+      "cmd/server/main.go"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/features/support-reports.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/support/sensitive_test.go",
+      "internal/support/render_test.go",
+      "internal/support/github_test.go",
+      "internal/support/service_test.go",
+      "internal/data/support_report_store_test.go",
+      "internal/data/support_report_store_pg_test.go",
+      "internal/config/config_test.go",
+      "internal/api/router_test.go"
+    ],
+    "coverage_must_test": [
+      "password is rejected",
+      "postal address is rejected",
+      "sixth report in 24h is 429",
+      "no session is 401",
+      "user only sees own reports",
+      "incident goes to private repo",
+      "github down keeps pending",
+      "create bug opens anonymised public issue",
+      "sensitive content is 422 without echo"
+    ],
+    "smoke_tags": [
+      "@nr",
+      "@security"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Signalements Bug/Incident depuis www.essensys.fr sans compte GitHub : API /api/support/reports, GitHub App, filtre des données sensibles, limite 5/24 h.",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "migrations/015_support_reports.sql",
+      "internal/support/routes.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": "../essensys-memory/openspec/changes/support-reports-2026-10-004/design.md",
+    "owner_security": "nrineau"
+  }
+}

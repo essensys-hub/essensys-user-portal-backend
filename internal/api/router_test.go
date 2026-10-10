@@ -12,6 +12,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/config"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/support"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -292,5 +293,28 @@ func TestPasswordChangeEndToEnd_SameTokenUnlocksAfterChange(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// /api/support/reports exists only in consolidated mode with the support
+// module, and always sits behind the user session check.
+func TestSupportReportsRoute_MountedBehindSession(t *testing.T) {
+	t.Setenv("NEW_RELIC_ENABLED", "false")
+	svc := support.NewService(nil, nil, support.Settings{})
+
+	cfg := config.Config{ExchangeStaleTTL: 120 * time.Second, CORSOrigin: "https://mon.essensys.fr", ConsolidatedMode: true}
+	handler := NewRouter(nil, &data.UserStore{}, nil, nil, nil, nil, nil, nil, nil, cfg, WithSupport(svc))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/support/reports", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("consolidated: got %d, want 401", rec.Code)
+	}
+
+	cfg.ConsolidatedMode = false
+	handler = NewRouter(nil, &data.UserStore{}, nil, nil, nil, nil, nil, nil, nil, cfg, WithSupport(svc))
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/support/reports", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("non-consolidated: got %d, want 404", rec.Code)
 	}
 }

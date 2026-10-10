@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/config"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/observability"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/support"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -71,7 +74,13 @@ func main() {
 	}
 
 	nrApp := observability.InitNewRelic()
-	router := api.NewRouter(store, users, audit, inventory, news, templates, iot, resets, nrApp, cfg)
+	var routerOpts []api.Option
+	if cfg.ConsolidatedMode {
+		svc := newSupportService(cfg, data.NewSupportReportStore(db))
+		routerOpts = append(routerOpts, api.WithSupport(svc))
+		go svc.Run(context.Background(), support.SyncInterval)
+	}
+	router := api.NewRouter(store, users, audit, inventory, news, templates, iot, resets, nrApp, cfg, routerOpts...)
 	log.Printf("essensys-user-portal-backend listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
 		log.Fatal(err)
@@ -92,4 +101,36 @@ func sortedSQLMigrations(dir string) ([]string, error) {
 	}
 	sort.Strings(paths)
 	return paths, nil
+}
+
+// newSupportService wires the support reports module. Without the GitHub App
+// settings, reports are accepted and stay pending until it is configured.
+func newSupportService(cfg config.Config, store *data.SupportReportStore) *support.Service {
+	key := []byte(cfg.SupportPseudonymKey)
+	if len(key) == 0 {
+		// Non-production only: Validate requires the key in production.
+		sum := sha256.Sum256([]byte("support-pseudonym:" + cfg.JWTSecret))
+		key = sum[:]
+		log.Println("WARNING: SUPPORT_PSEUDONYM_KEY not set — derived key in use (non-production only)")
+	}
+	var gh support.GitHub
+	if cfg.GitHubAppConfigured() {
+		pem, err := os.ReadFile(cfg.GitHubAppKeyFile)
+		if err != nil {
+			log.Printf("WARNING: GitHub App key: %v — support reports stay pending", err)
+		} else if pk, err := support.ParsePrivateKey(pem); err != nil {
+			log.Printf("WARNING: GitHub App key: unreadable PEM — support reports stay pending")
+		} else {
+			gh = support.NewAppClient(cfg.GitHubAppID, cfg.GitHubInstallation, pk, cfg.GitHubAPIURL)
+			log.Printf("Support reports: GitHub App %s active", cfg.GitHubAppID)
+		}
+	} else {
+		log.Println("WARNING: GitHub App not configured — support reports stay pending")
+	}
+	return support.NewService(store, gh, support.Settings{
+		PseudonymKey: key,
+		PublicRepo:   cfg.SupportPublicRepo,
+		PrivateRepo:  cfg.SupportPrivateRepo,
+		ProjectID:    cfg.SupportProjectID,
+	})
 }
