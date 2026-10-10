@@ -363,3 +363,31 @@ func TestStatusFromIssue(t *testing.T) {
 		}
 	}
 }
+
+// NR: NR-backend-8 essensys-hub/essensys-feature-lifecycle#18
+func Test_NR_backend_8_report_is_created_a_valider(t *testing.T) {
+	h := newHarness(t, true)
+	h.do(t, http.MethodPost, "alice@example.fr", bugInput())
+	h.do(t, http.MethodPost, "alice@example.fr", map[string]any{"kind": "incident", "title": "Panne",
+		"impact": "local", "actual": "Plus rien ne répond."})
+	if len(h.gh.created) != 2 {
+		t.Fatalf("%d issues created, want 2", len(h.gh.created))
+	}
+	for _, issue := range h.gh.created {
+		labels, _ := issue["labels"].([]any)
+		found := false
+		for _, l := range labels {
+			if l == LabelToTriage {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("issue %v created without %q: %v", issue["_path"], LabelToTriage, labels)
+		}
+		for _, l := range labels {
+			if l == "valide" {
+				t.Fatal("the bot must never set valide")
+			}
+		}
+	}
+}
