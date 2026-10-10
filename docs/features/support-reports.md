@@ -32,6 +32,7 @@ Chaque texte libre est limité à 4 000 caractères.
 - **Bug** : dépôt public `essensys-hub/essensys-support-site`, labels `bug` et `via-portal`, type Bug.
 - **Incident** : dépôt privé `essensys-hub/essensys-support`, labels `incident` et `via-portal`.
 - Les deux sont ajoutés au Project #6 si `SUPPORT_PROJECT_ID` est renseigné.
+- Les deux portent aussi le label **`a-valider`** : un mainteneur doit relire le signalement et poser `valide` avant tout travail automatisé (voir `essensys-feature-lifecycle/docs/feature-lifecycle/triage.md`).
 
 L'issue ne contient que les champs du formulaire et deux références : `U-xxxxxxxx` (pseudonyme stable du compte, HMAC avec `SUPPORT_PSEUDONYM_KEY`) et `R-xxxxxxxx` (référence du signalement). Ni nom, ni email, ni identifiant d'armoire. Les mentions `@…` sont neutralisées et le HTML est échappé.
 
