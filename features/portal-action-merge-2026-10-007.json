@@ -1,0 +1,90 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "portal-action-merge-2026-10-007",
+  "title": "Fusion sans perte des commandes en attente (Tout allumer) — backend",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-user-portal-backend#33",
+    "project_item": "PVTI_lADODqt0Wc4BavHTzg__zuc"
+  },
+  "git": {
+    "branch": "feat/portal-action-merge-2026-10-007",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "portal-action-merge-2026-10-007",
+    "path": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007",
+    "proposal": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/proposal.md",
+    "design": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/design.md",
+    "tasks": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/tasks.md",
+    "specs": [
+      "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/specs/portal-command-delivery/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "internal/domain/merge_params.go",
+      "internal/domain/order_expansion.go",
+      "internal/data/store.go",
+      "internal/legacyiot/handlers.go"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/features/portal-action-merge.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/domain/merge_params_test.go"
+    ],
+    "coverage_must_test": [
+      "tout allumer allume les 21 lampes",
+      "allumer puis eteindre eteint",
+      "deux bits sur un index se cumulent",
+      "ouvrir puis fermer un volet ferme",
+      "bloc complet et 590 a 1",
+      "bloc et scenario livres separement sous 30 parametres",
+      "acquittement passe toutes les actions regroupees en done"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Fusion des commandes en attente par OU bit à bit et dernière intention par équipement : « Tout allumer » n'écrase plus les autres lampes (#33).",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "internal/domain/merge_params.go",
+      "internal/data/store.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/design.md",
+    "owner_security": "nrineau"
+  }
+}
