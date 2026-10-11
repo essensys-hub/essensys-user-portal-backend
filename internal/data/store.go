@@ -210,35 +210,59 @@ func (s *PortalStore) FetchPendingActionsForMachine(ctx context.Context, machine
 		return nil, nil
 	}
 
-	paramChunks := make([][]domain.ExchangeKV, 0, len(rows))
-	guids := make([]string, 0, len(rows))
+	pending := make([]domain.CloudAction, 0, len(rows))
 	for _, r := range rows {
 		var params []domain.ExchangeKV
 		if err := json.Unmarshal(r.Params, &params); err != nil {
 			return nil, err
 		}
-		paramChunks = append(paramChunks, params)
-		guids = append(guids, r.GUID)
+		pending = append(pending, domain.CloudAction{
+			GUID: r.GUID, UserID: r.UserID, MachineID: r.MachineID,
+			Params: params, Status: domain.ActionStatusPending, CreatedAt: r.CreatedAt,
+		})
 	}
 
-	last := rows[len(rows)-1]
-	deliverParams := paramChunks[len(paramChunks)-1]
-	if len(rows) > 1 {
-		deliverParams = domain.MergeExchangeParams(paramChunks...)
-		log.Printf("[portal] coalesced %d pending cloud_actions for machine %d into guid %s",
-			len(rows), machineID, last.GUID)
+	deliver := coalescePendingActions(pending)
+	if len(deliver) < len(pending) {
+		log.Printf("[portal] coalesced %d pending cloud_actions for machine %d into %d action(s)",
+			len(pending), machineID, len(deliver))
 	}
 
-	for _, guid := range guids {
+	for _, a := range pending {
 		_, _ = s.db.ExecContext(ctx, `
 			UPDATE cloud_actions SET status = $1, delivered_at = NOW() WHERE guid = $2`,
-			domain.ActionStatusDelivered, guid)
+			domain.ActionStatusDelivered, a.GUID)
 	}
 
-	return []domain.CloudAction{{
-		GUID: last.GUID, UserID: last.UserID, MachineID: last.MachineID,
-		Params: deliverParams, Status: domain.ActionStatusPending, CreatedAt: last.CreatedAt,
-	}}, nil
+	return deliver, nil
+}
+
+// coalescePendingActions keeps the emission order and merges each run of
+// consecutive pure light/shutter block actions into one action, delivered under
+// the GUID of the last action of the run (design D3 of
+// portal-action-merge-2026-10-007). Other actions are delivered unchanged.
+func coalescePendingActions(pending []domain.CloudAction) []domain.CloudAction {
+	out := make([]domain.CloudAction, 0, len(pending))
+	for i := 0; i < len(pending); {
+		if !domain.IsPureBlockAction(pending[i].Params) {
+			out = append(out, pending[i])
+			i++
+			continue
+		}
+		j := i
+		chunks := make([][]domain.ExchangeKV, 0, 1)
+		for j < len(pending) && domain.IsPureBlockAction(pending[j].Params) {
+			chunks = append(chunks, pending[j].Params)
+			j++
+		}
+		merged := pending[j-1]
+		if len(chunks) > 1 {
+			merged.Params = domain.MergeBlockActions(chunks...)
+		}
+		out = append(out, merged)
+		i = j
+	}
+	return out
 }
 
 func (s *PortalStore) MachineIDFromHashedPkey(ctx context.Context, hashedPkey string) (int, error) {

@@ -2,14 +2,14 @@
   "$schema": "./schema/feature.schema.json",
   "id": "portal-action-merge-2026-10-007",
   "title": "Fusion sans perte des commandes en attente (Tout allumer) — backend",
-  "status": "proposed",
+  "status": "in-progress",
   "owner": "nrineau",
   "github": {
     "issue": "essensys-hub/essensys-user-portal-backend#33",
     "project_item": "PVTI_lADODqt0Wc4BavHTzg__zuc"
   },
   "git": {
-    "branch": "feat/portal-action-merge-2026-10-007",
+    "branch": "fix/portal-action-merge-2026-10-007",
     "pr_url": null
   },
   "openspec": {
@@ -25,9 +25,7 @@
   "implementation": {
     "paths": [
       "internal/domain/merge_params.go",
-      "internal/domain/order_expansion.go",
-      "internal/data/store.go",
-      "internal/legacyiot/handlers.go"
+      "internal/data/store.go"
     ],
     "primary_surface": "api"
   },
@@ -42,7 +40,8 @@
   "tests": {
     "playwright": [],
     "junit": [
-      "internal/domain/merge_params_test.go"
+      "internal/domain/merge_params_test.go",
+      "internal/data/store_pending_actions_test.go"
     ],
     "coverage_must_test": [
       "tout allumer allume les 21 lampes",
