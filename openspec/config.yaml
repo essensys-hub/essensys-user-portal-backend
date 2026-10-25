@@ -1,0 +1,6 @@
+schema: spec-driven
+
+context: |
+  Essensys — backend cloud (Go) de mon.essensys.fr : /api/portal/*, file d'actions cloud vers la gateway, cache de la table d'échange poussé par la gateway.
+  Gouvernance : essensys-feature-lifecycle/claude/GOVERNANCE.md (ticket GitHub Project #6, OpenSpec, /checkup, tests NR-*, jamais d'armoire réelle en test). Conventional commits référençant l'issue (#n). Français.
+  Commandes domotiques = injection k/v dans la table d'échange (indices legacy IoT : ne jamais les modifier).
