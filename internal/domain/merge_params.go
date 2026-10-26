@@ -32,7 +32,8 @@ func OppositeBlockIndex(k int) (int, bool) {
 func isBlockIndex(k int) bool { return k >= IndexLightStart && k <= IndexLightEnd }
 
 // IsPureBlockAction reports whether an action only carries the light/shutter
-// block (590 + 605..622). Only such actions are coalesced (design D3).
+// block (590 + 605..622, and 623 = "0"). Only such actions are coalesced
+// (design D3). A security outlet command (623 = 1|2) is never merged.
 func IsPureBlockAction(params []ExchangeKV) bool {
 	hasBlock := false
 	for _, p := range params {
@@ -40,6 +41,7 @@ func IsPureBlockAction(params []ExchangeKV) bool {
 		case isBlockIndex(p.K):
 			hasBlock = true
 		case p.K == IndexScenario:
+		case p.K == IndexSecurityOutlets && p.V == "0":
 		default:
 			return false
 		}
@@ -55,7 +57,8 @@ func IsPureBlockAction(params []ExchangeKV) bool {
 //   - "0" values added by ExpandLegacyScenarioBlock carry no intent;
 //   - a non-numeric value replaces the index (most recent wins), as in the
 //     legacy BitwiseFusion;
-//   - 590 is never merged: the block trigger is always "1".
+//   - 590 is never merged: the block trigger is always "1";
+//   - 623 is always "0": merged actions never touch the security outlets.
 func MergeBlockActions(chunks ...[]ExchangeKV) []ExchangeKV {
 	masks := make(map[int]int)
 	raw := make(map[int]string)
@@ -83,7 +86,7 @@ func MergeBlockActions(chunks ...[]ExchangeKV) []ExchangeKV {
 		}
 	}
 
-	out := make([]ExchangeKV, 0, IndexLightEnd-IndexLightStart+2)
+	out := make([]ExchangeKV, 0, IndexSecurityOutlets-IndexLightStart+2)
 	out = append(out, ExchangeKV{K: IndexScenario, V: "1"})
 	for k := IndexLightStart; k <= IndexLightEnd; k++ {
 		v, ok := raw[k]
@@ -92,6 +95,7 @@ func MergeBlockActions(chunks ...[]ExchangeKV) []ExchangeKV {
 		}
 		out = append(out, ExchangeKV{K: k, V: v})
 	}
+	out = append(out, ExchangeKV{K: IndexSecurityOutlets, V: "0"})
 	sort.Slice(out, func(i, j int) bool { return out[i].K < out[j].K })
 	return out
 }

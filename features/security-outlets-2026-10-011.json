@@ -1,0 +1,94 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "security-outlets-2026-10-011",
+  "title": "Piloter les prises de sécurité depuis les apps et le portail (cloud et local)",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#36",
+    "project_item": "PVTI_lADODqt0Wc4BavHTzhDc1KI"
+  },
+  "git": {
+    "branch": "feat/security-outlets-2026-10-011",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "security-outlets-2026-10-011",
+    "path": "openspec/changes/security-outlets-2026-10-011",
+    "proposal": "openspec/changes/security-outlets-2026-10-011/proposal.md",
+    "design": "openspec/changes/security-outlets-2026-10-011/design.md",
+    "tasks": "openspec/changes/security-outlets-2026-10-011/tasks.md",
+    "specs": [
+      "openspec/changes/security-outlets-2026-10-011/specs/security-outlet-command/spec.md",
+      "openspec/changes/security-outlets-2026-10-011/specs/security-outlet-merge/spec.md",
+      "openspec/changes/security-outlets-2026-10-011/specs/security-outlet-state/spec.md",
+      "openspec/changes/security-outlets-2026-10-011/specs/security-outlets-quality/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "internal/domain/order_expansion.go",
+      "internal/domain/merge_params.go",
+      "internal/data/store.go",
+      "internal/handlers/portal.go",
+      "migrations/016_security_outlets_sync_profile.sql"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/features/portal-action-merge.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/domain/order_expansion_test.go",
+      "internal/domain/merge_params_test.go",
+      "internal/data/store_pending_actions_test.go",
+      "internal/data/exchange_test.go",
+      "internal/data/migration_security_outlets_test.go"
+    ],
+    "coverage_must_test": [
+      "coupure seule complete 590 et 605 a 622",
+      "eclairage ajoute 623 a 0",
+      "coupure jamais fusionnee avec eclairage"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Commande des prises de sécurité (623) déclenchée et jamais rejouée ; regroupement des actions compatible (#36).",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "internal/domain/merge_params.go",
+      "internal/data/store.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/design.md",
+    "owner_security": "nrineau"
+  }
+}

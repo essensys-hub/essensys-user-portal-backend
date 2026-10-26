@@ -44,3 +44,16 @@ func TestParseKeyListEmpty(t *testing.T) {
 		t.Fatal("expected error for empty keys")
 	}
 }
+
+// security-outlets-2026-10-011 (#43): the security outlet state (440) pushed by
+// the gateway is read like any other index; never pushed means absent.
+func TestMergeExchangeKeys_etat_des_prises_440(t *testing.T) {
+	cache := []domain.ExchangeKV{{K: 440, V: "1"}, {K: 605, V: "0"}}
+	got := MergeExchangeKeys(cache, nil, []int{440})
+	if len(got) != 1 || got[0].K != 440 || got[0].V != "1" {
+		t.Fatalf("expected 440=1, got %v", got)
+	}
+	if got := MergeExchangeKeys([]domain.ExchangeKV{{K: 605, V: "0"}}, nil, []int{440}); len(got) != 0 {
+		t.Fatalf("440 never pushed must be absent, got %v", got)
+	}
+}
