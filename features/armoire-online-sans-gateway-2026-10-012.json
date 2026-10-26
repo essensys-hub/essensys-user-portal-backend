@@ -41,11 +41,7 @@
   "tests": {
     "playwright": [],
     "junit": [
-      "internal/domain/order_expansion_test.go",
-      "internal/domain/merge_params_test.go",
-      "internal/data/store_pending_actions_test.go",
-      "internal/data/exchange_test.go",
-      "internal/data/migration_security_outlets_test.go"
+      "internal/domain/portal_session_test.go"
     ],
     "coverage_must_test": [
       "avec gateway en ligne",
