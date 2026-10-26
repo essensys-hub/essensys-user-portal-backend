@@ -2,7 +2,7 @@
   "$schema": "./schema/feature.schema.json",
   "id": "portal-action-merge-2026-10-007",
   "title": "Fusion sans perte des commandes en attente (Tout allumer) — backend",
-  "status": "in-progress",
+  "status": "archived",
   "owner": "nrineau",
   "github": {
     "issue": "essensys-hub/essensys-user-portal-backend#33",
@@ -10,16 +10,16 @@
   },
   "git": {
     "branch": "fix/portal-action-merge-2026-10-007",
-    "pr_url": null
+    "pr_url": "https://github.com/essensys-hub/essensys-user-portal-backend/pull/38"
   },
   "openspec": {
     "change_id": "portal-action-merge-2026-10-007",
-    "path": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007",
-    "proposal": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/proposal.md",
-    "design": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/design.md",
-    "tasks": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/tasks.md",
+    "path": "../essensys-memory/openspec/changes/archive/2026-10-11-portal-action-merge-2026-10-007",
+    "proposal": "../essensys-memory/openspec/changes/archive/2026-10-11-portal-action-merge-2026-10-007/proposal.md",
+    "design": "../essensys-memory/openspec/changes/archive/2026-10-11-portal-action-merge-2026-10-007/design.md",
+    "tasks": "../essensys-memory/openspec/changes/archive/2026-10-11-portal-action-merge-2026-10-007/tasks.md",
     "specs": [
-      "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/specs/portal-command-delivery/spec.md"
+      "../essensys-memory/openspec/specs/portal-command-delivery/spec.md"
     ]
   },
   "implementation": {
@@ -83,7 +83,7 @@
       "last_scan_at": null
     },
     "muted_findings": [],
-    "threat_model_url": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/design.md",
+    "threat_model_url": "../essensys-memory/openspec/changes/archive/2026-10-11-portal-action-merge-2026-10-007/design.md",
     "owner_security": "nrineau"
   }
 }

@@ -1,6 +1,6 @@
 # Fusion des commandes du portail
 
-> Feature `portal-action-merge-2026-10-007` — essensys-hub/essensys-user-portal-backend#33 (statut : en cours)
+> Feature `portal-action-merge-2026-10-007` — essensys-hub/essensys-user-portal-backend#33 (statut : archivée, déployée le 2026-10-11)
 
 Quand plusieurs commandes du portail attendent la même armoire, le hub les livre ensemble. La livraison doit avoir le même effet que les commandes appliquées une à une :
 
