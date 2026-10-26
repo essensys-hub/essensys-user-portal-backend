@@ -346,13 +346,29 @@ func (h *Handler) ReviewLinkRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
-	if body.Status != domain.LinkStatusApproved && body.Status != domain.LinkStatusRejected {
+	switch body.Status {
+	case domain.LinkStatusApproved, domain.LinkStatusRejected, domain.LinkStatusRevoked:
+	default:
 		http.Error(w, "Invalid status", http.StatusBadRequest)
 		return
 	}
 	var reqID int
 	if _, err := fmt.Sscanf(id, "%d", &reqID); err != nil {
 		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+	if body.Status == domain.LinkStatusRevoked {
+		n, err := h.store.RevokeUserLinks(r.Context(), reqID, reviewer)
+		if err != nil {
+			http.Error(w, "Update failed", http.StatusInternalServerError)
+			return
+		}
+		if n == 0 {
+			http.Error(w, "No approved link to revoke", http.StatusConflict)
+			return
+		}
+		_ = h.store.AuditLog(r.Context(), reviewer, "portal_link_revoke", map[string]any{"link_request_id": reqID, "revoked": n})
+		writeJSON(w, http.StatusOK, map[string]string{"status": body.Status})
 		return
 	}
 	if err := h.store.UpdateLinkRequestStatus(r.Context(), reqID, body.Status, reviewer); err != nil {
