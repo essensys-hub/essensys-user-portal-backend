@@ -119,8 +119,11 @@ func TestMerge_bloc_complet_et_590_a_1(t *testing.T) {
 			t.Fatalf("missing index %d", k)
 		}
 	}
-	if len(merged) != IndexLightEnd-IndexLightStart+2 {
-		t.Fatalf("block must have 19 params, got %d", len(merged))
+	if got[IndexSecurityOutlets] != "0" {
+		t.Fatalf("623 must be 0 after a merge, got %q", got[IndexSecurityOutlets])
+	}
+	if len(merged) != IndexSecurityOutlets-IndexLightStart+2 {
+		t.Fatalf("block must have 20 params, got %d", len(merged))
 	}
 	if len(merged) > MaxFirmwareParamsPerAction {
 		t.Fatalf("block exceeds firmware limit")
@@ -158,5 +161,8 @@ func TestIsPureBlockAction(t *testing.T) {
 	}
 	if IsPureBlockAction(append(inject(613, 64), ExchangeKV{K: 349, V: "1"})) {
 		t.Fatal("mixed action is not pure")
+	}
+	if IsPureBlockAction(inject(IndexSecurityOutlets, 1)) {
+		t.Fatal("security outlet cut is not a pure block action")
 	}
 }

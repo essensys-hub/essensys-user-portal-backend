@@ -192,3 +192,37 @@ func Test_NR_backend_9_tout_allumer_livre_les_21_lampes(t *testing.T) {
 		}
 	}
 }
+
+// NR: NR-backend-12 essensys-hub/essensys-user-portal-backend#42
+// A security outlet cut queued between two light commands is delivered alone,
+// in place: merging it would replay the cut with later light commands.
+func Test_NR_backend_12_coupure_des_prises_jamais_fusionnee(t *testing.T) {
+	cut := domain.ExpandLegacyScenarioBlock([]domain.ExchangeKV{{K: domain.IndexSecurityOutlets, V: "1"}})
+	store, mock := mockPending(t, 31, []pendingRow{
+		{"light-a", lightCmd(612, 128)},
+		{"cut", cut},
+		{"light-b", lightCmd(613, 64)},
+		{"light-c", lightCmd(611, 1)},
+	})
+	got, err := store.FetchPendingActionsForMachine(context.Background(), 31, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected light, cut, merged lights; got %d actions", len(got))
+	}
+	if got[1].GUID != "cut" || valuesOf(got[1].Params)[domain.IndexSecurityOutlets] != "1" {
+		t.Fatalf("cut must be delivered alone in second place, got %s %v", got[1].GUID, got[1].Params)
+	}
+	for _, i := range []int{0, 2} {
+		if v := valuesOf(got[i].Params)[domain.IndexSecurityOutlets]; v != "0" {
+			t.Fatalf("light action %s must carry 623=0, got %q", got[i].GUID, v)
+		}
+	}
+	if v := valuesOf(got[2].Params); v[613] != "64" || v[611] != "1" {
+		t.Fatalf("lights b and c should be merged, got 613=%q 611=%q", v[613], v[611])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
