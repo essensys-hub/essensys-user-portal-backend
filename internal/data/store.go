@@ -417,7 +417,7 @@ func (s *PortalStore) IsGatewayOnline(ctx context.Context, gatewayID string, tim
 	if err != nil || lastSeen == nil {
 		return false, err
 	}
-	return time.Since(*lastSeen) <= timeout, nil
+	return domain.IsOnline(*lastSeen, time.Now(), timeout), nil
 }
 
 func (s *PortalStore) AuditLog(ctx context.Context, email, action string, details map[string]any) error {

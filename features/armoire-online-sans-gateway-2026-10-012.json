@@ -1,0 +1,88 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "armoire-online-sans-gateway-2026-10-012",
+  "title": "Armoire en ligne avec ou sans gateway (apps et portail cloud)",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#37",
+    "project_item": "PVTI_lADODqt0Wc4BavHTzhDkSIQ"
+  },
+  "git": {
+    "branch": "fix/armoire-online-sans-gateway-2026-10-012",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "armoire-online-sans-gateway-2026-10-012",
+    "path": "openspec/changes/armoire-online-sans-gateway-2026-10-012",
+    "proposal": "openspec/changes/armoire-online-sans-gateway-2026-10-012/proposal.md",
+    "design": "openspec/changes/armoire-online-sans-gateway-2026-10-012/design.md",
+    "tasks": "openspec/changes/armoire-online-sans-gateway-2026-10-012/tasks.md",
+    "specs": [
+      "openspec/changes/armoire-online-sans-gateway-2026-10-012/specs/armoire-online/spec.md",
+      "openspec/changes/armoire-online-sans-gateway-2026-10-012/specs/armoire-online-quality/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "internal/domain/portal_session.go",
+      "internal/handlers/portal.go"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/features/armoire-online.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/domain/portal_session_test.go"
+    ],
+    "coverage_must_test": [
+      "avec gateway en ligne",
+      "gateway hors ligne armoire vue",
+      "gateway et armoire hors ligne",
+      "sans gateway armoire vue en ligne",
+      "sans gateway armoire ancienne hors ligne",
+      "sans gateway ni armoire hors ligne"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Backend cloud : la session portail indique si l'armoire est en ligne, avec ou sans gateway (#37).",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "internal/domain/merge_params.go",
+      "internal/data/store.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": "../essensys-memory/openspec/changes/portal-action-merge-2026-10-007/design.md",
+    "owner_security": "nrineau"
+  }
+}

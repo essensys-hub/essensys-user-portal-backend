@@ -106,7 +106,7 @@ func (h *Handler) GatewayStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"online": false})
 		return
 	}
-	online, _ := h.store.IsGatewayOnline(r.Context(), *user.LinkedGatewayID, 2*time.Minute)
+	online, _ := h.store.IsGatewayOnline(r.Context(), *user.LinkedGatewayID, domain.OnlineTimeout)
 	writeJSON(w, http.StatusOK, map[string]bool{"online": online})
 }
 
@@ -119,25 +119,22 @@ func (h *Handler) PortalSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	portalAccess := h.userPortalAccess(r.Context(), user)
-	resp := domain.PortalSessionResponse{
-		User: domain.PortalUserInfo{
-			ID:              user.ID,
-			Email:           user.Email,
-			FirstName:       user.FirstName,
-			LastName:        user.LastName,
-			Role:            user.Role,
-			LinkedMachineID: user.LinkedMachineID,
-			LinkedGatewayID: user.LinkedGatewayID,
-			LinkedArmoireID: user.LinkedArmoireID,
-		},
-		PortalAccess: portalAccess,
+	userInfo := domain.PortalUserInfo{
+		ID:              user.ID,
+		Email:           user.Email,
+		FirstName:       user.FirstName,
+		LastName:        user.LastName,
+		Role:            user.Role,
+		LinkedMachineID: user.LinkedMachineID,
+		LinkedGatewayID: user.LinkedGatewayID,
+		LinkedArmoireID: user.LinkedArmoireID,
 	}
 
+	var gateway *domain.PortalGatewayInfo
 	if h.inventory != nil && user.LinkedGatewayID != nil && domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
-		online, _ := h.store.IsGatewayOnline(r.Context(), *user.LinkedGatewayID, 2*time.Minute)
-		gw := h.resolveGateway(*user.LinkedGatewayID)
-		if gw != nil {
-			resp.Gateway = &domain.PortalGatewayInfo{
+		online, _ := h.store.IsGatewayOnline(r.Context(), *user.LinkedGatewayID, domain.OnlineTimeout)
+		if gw := h.resolveGateway(*user.LinkedGatewayID); gw != nil {
+			gateway = &domain.PortalGatewayInfo{
 				ID:       *user.LinkedGatewayID,
 				Hostname: gw.Hostname,
 				IP:       gw.IP,
@@ -145,26 +142,16 @@ func (h *Handler) PortalSession(w http.ResponseWriter, r *http.Request) {
 				LastSeen: gw.LastSeen,
 			}
 		} else {
-			resp.Gateway = &domain.PortalGatewayInfo{
-				ID:     *user.LinkedGatewayID,
-				Online: online,
-			}
+			gateway = &domain.PortalGatewayInfo{ID: *user.LinkedGatewayID, Online: online}
 		}
 	}
 
+	var armoire *domain.MachineDetail
 	if h.inventory != nil && portalAccess {
-		if arm := h.resolveArmoire(user.LinkedArmoireID, user.LinkedMachineID); arm != nil {
-			resp.Armoire = &domain.PortalArmoireInfo{
-				ID:          arm.ID,
-				NoSerie:     arm.NoSerie,
-				IP:          arm.IP,
-				LastSeen:    arm.LastSeen,
-				GeoLocation: arm.GeoLocation,
-				Remote:      true,
-			}
-		}
+		armoire = h.resolveArmoire(user.LinkedArmoireID, user.LinkedMachineID)
 	}
 
+	resp := domain.NewPortalSessionResponse(userInfo, portalAccess, gateway, armoire, time.Now())
 	writeJSON(w, http.StatusOK, resp)
 }
 
