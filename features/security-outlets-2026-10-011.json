@@ -30,7 +30,8 @@
       "internal/domain/order_expansion.go",
       "internal/domain/merge_params.go",
       "internal/data/store.go",
-      "internal/handlers/portal.go"
+      "internal/handlers/portal.go",
+      "migrations/016_security_outlets_sync_profile.sql"
     ],
     "primary_surface": "api"
   },
@@ -47,7 +48,9 @@
     "junit": [
       "internal/domain/order_expansion_test.go",
       "internal/domain/merge_params_test.go",
-      "internal/data/store_pending_actions_test.go"
+      "internal/data/store_pending_actions_test.go",
+      "internal/data/exchange_test.go",
+      "internal/data/migration_security_outlets_test.go"
     ],
     "coverage_must_test": [
       "coupure seule complete 590 et 605 a 622",

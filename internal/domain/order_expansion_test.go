@@ -36,7 +36,7 @@ func TestExpandLegacyScenarioBlock_noOpOutsideRange(t *testing.T) {
 // NR: NR-backend-10 essensys-hub/essensys-user-portal-backend#42
 // security-outlets-2026-10-011: a lone security outlet
 // command is completed into a full scenario 1 block.
-func Test_NR_backend_10(t *testing.T) {
+func Test_NR_backend_10_coupure_seule_complete_590_et_605_a_622(t *testing.T) {
 	for _, v := range []string{"1", "2"} {
 		seen := map[int]string{}
 		for _, p := range ExpandLegacyScenarioBlock([]ExchangeKV{{K: IndexSecurityOutlets, V: v}}) {
@@ -59,7 +59,7 @@ func Test_NR_backend_10(t *testing.T) {
 // NR: NR-backend-11 essensys-hub/essensys-user-portal-backend#42
 // security-outlets-2026-10-011: a light command carries
 // 623=0 and cannot replay a cut; a mixed batch keeps both values.
-func Test_NR_backend_11(t *testing.T) {
+func Test_NR_backend_11_eclairage_ajoute_623_a_0(t *testing.T) {
 	seen := map[int]string{}
 	for _, p := range ExpandLegacyScenarioBlock([]ExchangeKV{{K: 612, V: "128"}}) {
 		seen[p.K] = p.V

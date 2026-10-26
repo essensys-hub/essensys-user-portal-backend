@@ -26,6 +26,9 @@ Motivation : voir `proposal.md`. État des lieux (2026-10-26) : aucune interface
 ### D3 — Lecture de 440
 Rien à coder : `/api/portal/exchange` sert déjà toute clé présente dans le cache. Un test vérifie que 440 poussé par la gateway est renvoyé. Les endpoints legacy (`serverinfos`, `mystatus`, `myactions`, `done`) ne changent pas : une installation sans gateway n'aura pas l'état (« État inconnu »).
 
+### D4 — Profil de synchronisation « Prises de sécurité »
+Les profils `sync_profiles` vivent dans ce dépôt (migrations 007 et 009). La migration `016_security_outlets_sync_profile.sql` crée le profil [440, 440], pull + push, activé, sans toucher aux profils existants. Elle est idempotente (`WHERE NOT EXISTS`), car les migrations sont rejouées à chaque démarrage. La gateway reçoit ce profil par `sync-config` et pousse 440 à chaque cycle.
+
 ## Risks / Trade-offs
 
 - [Le BP garde 623 après exécution du scénario 1] → C2 : 623 = 0 sur chaque commande d'éclairage ou de volets.
