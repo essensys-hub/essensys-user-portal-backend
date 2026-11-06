@@ -21,7 +21,10 @@ type Handlers struct {
 	turnstileEnforced bool
 	resets            *data.PasswordResetStore
 	audit             *data.AuditStore
-	mailer            *mailtpl.Sender
+	remember          *data.RememberSessionStore
+	// now is the clock of the remembered-session rules; tests replace it.
+	now    func() time.Time
+	mailer *mailtpl.Sender
 	// dispatch runs background work. Tests replace it to observe the mail that
 	// the forgot flow would otherwise send from a goroutine that outlives them.
 	dispatch func(func())
@@ -38,6 +41,12 @@ func WithAudit(audit *data.AuditStore) Option {
 	return func(h *Handlers) { h.audit = audit }
 }
 
+// WithRememberSessions enables remember_me at login and /auth/remember/refresh.
+// Without it the server behaves as before and ignores remember_me.
+func WithRememberSessions(store *data.RememberSessionStore) Option {
+	return func(h *Handlers) { h.remember = store }
+}
+
 func WithMailer(mailer *mailtpl.Sender) Option {
 	return func(h *Handlers) { h.mailer = mailer }
 }
@@ -50,6 +59,9 @@ func NewHandlers(users *data.UserStore, verifier turnstile.Verifier, turnstileEn
 	}
 	for _, opt := range opts {
 		opt(h)
+	}
+	if h.now == nil {
+		h.now = time.Now
 	}
 	return h
 }
@@ -164,20 +176,30 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = h.users.UpdateLastLogin(user.ID)
-	token, err := middleware.GenerateJWT(user.Email, user.Role, time.Now().Add(24*time.Hour))
+	token, err := middleware.GenerateJWT(user.Email, user.Role, h.now().Add(24*time.Hour))
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"token":                    token,
 		"user":                     domain.UserToResponse(user),
 		"password_change_required": domain.PasswordChangeRequired(user),
-	})
-}
-
-func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	}
+	// Only when asked, and only when this server can honour it: a client that
+	// never sends remember_me gets exactly the response it always got.
+	if req.RememberMe && h.remember != nil {
+		rememberToken, expiresAt, err := h.issueRememberSession(user.ID, r)
+		if err != nil {
+			log.Printf("remember: create session user_id=%d: %v", user.ID, err)
+			http.Error(w, "Failed to create session", http.StatusInternalServerError)
+			return
+		}
+		resp["remember_token"] = rememberToken
+		resp["remember_expires_at"] = expiresAt.UTC().Format(time.RFC3339)
+		h.auditRemember(user.ID, user.Email, "REMEMBER_SESSION_CREATED", middleware.ClientIP(r), "30-day remembered session created")
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handlers) GetProfile(w http.ResponseWriter, r *http.Request) {

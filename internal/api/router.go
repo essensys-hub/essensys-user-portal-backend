@@ -24,7 +24,13 @@ import (
 type Option func(*routerOptions)
 
 type routerOptions struct {
-	support *support.Service
+	support  *support.Service
+	remember *data.RememberSessionStore
+}
+
+// WithRememberSessions enables the 30-day remembered sessions (consolidated mode only).
+func WithRememberSessions(store *data.RememberSessionStore) Option {
+	return func(o *routerOptions) { o.remember = store }
 }
 
 // WithSupport mounts /api/support/reports (consolidated mode only).
@@ -64,6 +70,9 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 			identityOpts := []identity.Option{
 				identity.WithPasswordResets(resets),
 				identity.WithAudit(audit),
+			}
+			if o.remember != nil {
+				identityOpts = append(identityOpts, identity.WithRememberSessions(o.remember))
 			}
 			// Without the mailer the forgot endpoint still issues tokens but
 			// nothing reaches the user, so only wire it when templates exist.

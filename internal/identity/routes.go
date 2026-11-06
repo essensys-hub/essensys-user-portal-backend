@@ -42,6 +42,9 @@ func Mount(r chi.Router, users *data.UserStore, cfg config.Config, opts ...Optio
 	// Same shape as resetLimiter: this route only ever affects the caller's
 	// own account, so it gets the same generous ceiling.
 	changeLimiter := middleware.NewRateLimiter(10, time.Hour)
+	// A device renews about once a day, so this is generous for a household
+	// behind one address and still stops a token-guessing burst.
+	rememberLimiter := middleware.NewRateLimiter(60, time.Hour)
 
 	r.With(registerRateLimitMiddleware(registerLimiter)).Post("/auth/register", h.Register)
 	r.Post("/auth/login", h.Login)
@@ -49,6 +52,7 @@ func Mount(r chi.Router, users *data.UserStore, cfg config.Config, opts ...Optio
 	r.Get("/auth/password/reset/validate", h.ValidateResetToken)
 	r.With(resetRateLimitMiddleware(resetLimiter)).Post("/auth/password/reset", h.ResetPassword)
 	r.Post("/auth/logout", h.Logout)
+	r.With(rememberRateLimitMiddleware(rememberLimiter)).Post("/auth/remember/refresh", h.RememberRefresh)
 	r.Get("/auth/google/login", h.GoogleLogin)
 	r.Get("/auth/google/callback", h.GoogleCallback)
 	r.Get("/auth/apple/login", h.AppleLogin)
@@ -113,6 +117,20 @@ func changePasswordRateLimitMiddleware(rl *middleware.RateLimiter) func(http.Han
 				writeJSON(w, http.StatusTooManyRequests, map[string]string{
 					"message": "Trop de tentatives. Merci de réessayer plus tard.",
 				})
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func rememberRateLimitMiddleware(rl *middleware.RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := middleware.ClientIP(r)
+			if !rl.Allow(ip) {
+				log.Printf("audit action=REMEMBER_REFRESH_BLOCKED_RATELIMIT ip=%s", ip)
+				writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
 				return
 			}
 			next.ServeHTTP(w, r)
