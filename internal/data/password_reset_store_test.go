@@ -38,6 +38,10 @@ func TestConsumeAndSetPassword_GuardsAreConditional(t *testing.T) {
 	mock.ExpectExec(`UPDATE password_reset_tokens SET invalidated_at`).
 		WithArgs(12).
 		WillReturnResult(sqlmock.NewResult(0, 2))
+	// A reset is a password change: remembered sessions end in the same transaction.
+	mock.ExpectExec(`UPDATE remember_sessions SET revoked_at = NOW\(\)`).
+		WithArgs(12).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	userID, err := store.ConsumeAndSetPassword("digest", "newhash", "1.2.3.4")

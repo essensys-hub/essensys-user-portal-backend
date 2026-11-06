@@ -78,6 +78,7 @@ func main() {
 	if cfg.ConsolidatedMode {
 		svc := newSupportService(cfg, data.NewSupportReportStore(db))
 		routerOpts = append(routerOpts, api.WithSupport(svc))
+		routerOpts = append(routerOpts, api.WithRememberSessions(data.NewRememberSessionStore(db)))
 		go svc.Run(context.Background(), support.SyncInterval)
 	}
 	router := api.NewRouter(store, users, audit, inventory, news, templates, iot, resets, nrApp, cfg, routerOpts...)

@@ -93,9 +93,8 @@ func (s *UserStore) UpdateLastLogin(userID int) error {
 
 func (s *UserStore) UpdateUser(userID int, firstName, lastName, passwordHash string) error {
 	if passwordHash != "" {
-		_, err := s.db.Exec(`UPDATE users SET first_name = $1, last_name = $2, password_hash = $3 WHERE id = $4`,
+		return s.writeCredential(userID, `UPDATE users SET first_name = $1, last_name = $2, password_hash = $3 WHERE id = $4`,
 			firstName, lastName, passwordHash, userID)
-		return err
 	}
 	_, err := s.db.Exec(`UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3`, firstName, lastName, userID)
 	return err
@@ -105,8 +104,29 @@ func (s *UserStore) UpdateUser(userID int, firstName, lastName, passwordHash str
 // caller to re-send first and last name, which risks clobbering a concurrent
 // profile edit with stale values.
 func (s *UserStore) UpdatePasswordHash(userID int, passwordHash string) error {
-	_, err := s.db.Exec(`UPDATE users SET password_hash = $1 WHERE id = $2`, passwordHash, userID)
-	return err
+	return s.writeCredential(userID, `UPDATE users SET password_hash = $1 WHERE id = $2`, passwordHash, userID)
+}
+
+// writeCredential runs a statement that replaces a user's password and, in the
+// same transaction, ends all of that user's remembered sessions: a password
+// change must never leave a 30-day session alive on another device.
+func (s *UserStore) writeCredential(userID int, query string, args ...any) (err error) {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err = tx.Exec(query, args...); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(revokeAllRememberSQL, userID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *UserStore) DeleteUser(userID int) error {
@@ -143,7 +163,7 @@ func (s *UserStore) UpdateUserLinks(userID int, machineID *int, gatewayID *strin
 // traceability (temp_password_issued_by), separate from audit_logs so it
 // survives even if the log entry is pruned.
 func (s *UserStore) SetTemporaryPassword(userID int, hash string, expiresAt time.Time, issuedBy int) error {
-	_, err := s.db.Exec(`
+	return s.writeCredential(userID, `
 		UPDATE users
 		SET password_hash = $1,
 		    password_change_required_at = NOW(),
@@ -151,7 +171,6 @@ func (s *UserStore) SetTemporaryPassword(userID int, hash string, expiresAt time
 		    temp_password_issued_by = $3
 		WHERE id = $4`,
 		hash, expiresAt, issuedBy, userID)
-	return err
 }
 
 // ClearPasswordChangeRequired installs the user's own new password and lifts
@@ -160,7 +179,7 @@ func (s *UserStore) SetTemporaryPassword(userID int, hash string, expiresAt time
 // gap would either strand the user behind the lock or leave a window where
 // the old temporary password briefly reads as still required.
 func (s *UserStore) ClearPasswordChangeRequired(userID int, hash string) error {
-	_, err := s.db.Exec(`
+	return s.writeCredential(userID, `
 		UPDATE users
 		SET password_hash = $1,
 		    password_change_required_at = NULL,
@@ -168,7 +187,6 @@ func (s *UserStore) ClearPasswordChangeRequired(userID int, hash string) error {
 		    temp_password_issued_by = NULL
 		WHERE id = $2`,
 		hash, userID)
-	return err
 }
 
 func (s *UserStore) GetAllUsers() ([]*domain.User, error) {

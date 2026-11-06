@@ -39,9 +39,14 @@ func callIssue(h *Handlers, id, callerEmail string, body map[string]any) *httpte
 }
 
 func expectSetTemporaryPassword(mock sqlmock.Sqlmock, userID int) {
+	mock.ExpectBegin()
 	mock.ExpectExec(`(?s)UPDATE users\s+SET password_hash = \$1,\s+password_change_required_at = NOW\(\),\s+temp_password_expires_at = \$2,\s+temp_password_issued_by = \$3\s+WHERE id = \$4`).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), userID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`UPDATE remember_sessions SET revoked_at = NOW\(\)`).
+		WithArgs(userID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 }
 
 func expectInvalidateResetTokens(mock sqlmock.Sqlmock, userID int) {

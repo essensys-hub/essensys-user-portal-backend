@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,9 +259,14 @@ func TestPasswordChangeEndToEnd_SameTokenUnlocksAfterChange(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM users WHERE email`).
 		WithArgs("user@example.com").
 		WillReturnRows(userRowWithLock("user@example.com", string(tempHash), &changeRequiredAt, &tempExpiresAt))
+	mock.ExpectBegin()
 	mock.ExpectExec(`(?s)UPDATE users\s+SET password_hash = \$1,\s+password_change_required_at = NULL,\s+temp_password_expires_at = NULL,\s+temp_password_issued_by = NULL\s+WHERE id = \$2`).
 		WithArgs(sqlmock.AnyArg(), 1).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`UPDATE remember_sessions SET revoked_at = NOW\(\)`).
+		WithArgs(1).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectCommit()
 
 	changeBody, _ := json.Marshal(map[string]string{
 		"current_password": "temp-password",
@@ -316,5 +322,35 @@ func TestSupportReportsRoute_MountedBehindSession(t *testing.T) {
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/support/reports", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("non-consolidated: got %d, want 404", rec.Code)
+	}
+}
+
+// The remembered-session route is wired through NewRouter, not only reachable
+// from handler tests: enabled it answers on the real mux, disabled it answers
+// 503 so an app can tell the server does not support it.
+func TestRememberRefreshRoute_IsMountedThroughTheRouter(t *testing.T) {
+	t.Setenv("NEW_RELIC_ENABLED", "false")
+	t.Setenv("JWT_SECRET", "test-secret-key-1234567890123456")
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	sx := sqlx.NewDb(db, "sqlmock")
+	cfg := config.Config{ConsolidatedMode: true, ExchangeStaleTTL: 120 * time.Second, CORSOrigin: "https://mon.essensys.fr"}
+
+	call := func(h http.Handler) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/remember/refresh", strings.NewReader(`{"remember_token":""}`))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	enabled := NewRouter(nil, data.NewUserStore(sx), nil, nil, nil, nil, nil, nil, nil, cfg, WithRememberSessions(data.NewRememberSessionStore(sx)))
+	if rec := call(enabled); rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "remember_invalid") {
+		t.Fatalf("enabled: %d %s, want 401 remember_invalid", rec.Code, rec.Body.String())
+	}
+	disabled := NewRouter(nil, data.NewUserStore(sx), nil, nil, nil, nil, nil, nil, nil, cfg)
+	if rec := call(disabled); rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("disabled: %d, want 503", rec.Code)
 	}
 }

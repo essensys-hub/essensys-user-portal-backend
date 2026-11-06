@@ -48,6 +48,8 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	// RememberMe asks for a 30-day remembered session on top of the 24 h JWT.
+	RememberMe bool `json:"remember_me"`
 }
 
 type UserResponse struct {

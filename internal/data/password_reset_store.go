@@ -150,6 +150,11 @@ func (s *PasswordResetStore) ConsumeAndSetPassword(tokenHash, newPasswordHash, i
 		return 0, err
 	}
 
+	// A reset is a password change: every remembered session ends with it.
+	if _, err = tx.Exec(revokeAllRememberSQL, userID); err != nil {
+		return 0, err
+	}
+
 	if err = tx.Commit(); err != nil {
 		return 0, err
 	}
