@@ -54,6 +54,9 @@ const (
 	LinkStatusPending  = "pending"
 	LinkStatusApproved = "approved"
 	LinkStatusRejected = "rejected"
+	// LinkStatusRevoked: admin withdrew a previously approved link; the user
+	// loses portal access and may submit a new request.
+	LinkStatusRevoked = "revoked"
 
 	ActionStatusPending   = "pending"
 	ActionStatusDelivered = "delivered"

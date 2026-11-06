@@ -16,7 +16,8 @@ Base URL prod : `https://mon.essensys.fr/api`
 | GET | `/portal/exchange` | JWT user |
 | GET | `/portal/history/latest` | JWT user |
 | POST | `/portal/web/actions` | JWT user |
-| POST | `/portal/admin/link-requests/{id}/approve` | JWT admin |
+| GET | `/portal/admin/link-requests?status=pending\|history\|all` | JWT admin — `history` = approved/rejected/revoked |
+| PUT | `/portal/admin/link-requests/{id}` | JWT admin — body `{"status":"approved"\|"rejected"\|"revoked"}` ; `revoked` retire l'accès portail (toutes les liaisons approuvées de l'utilisateur, 409 si aucune) et l'utilisateur peut refaire une demande |
 | POST | `/portal/admin/gateways/register` | JWT admin |
 
 ## Gateway CM5 (`internal/gateway`)
