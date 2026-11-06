@@ -44,9 +44,14 @@ func TestSetTemporaryPassword(t *testing.T) {
 
 	expiresAt := time.Now().Add(72 * time.Hour)
 
+	mock.ExpectBegin()
 	mock.ExpectExec(`(?s)UPDATE users\s+SET password_hash = \$1,\s+password_change_required_at = NOW\(\),\s+temp_password_expires_at = \$2,\s+temp_password_issued_by = \$3\s+WHERE id = \$4`).
 		WithArgs("newhash", expiresAt, 7, 42).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`UPDATE remember_sessions SET revoked_at = NOW\(\)`).
+		WithArgs(42).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	store := NewUserStore(sqlx.NewDb(db, "sqlmock"))
 	if err := store.SetTemporaryPassword(42, "newhash", expiresAt, 7); err != nil {
@@ -65,9 +70,14 @@ func TestClearPasswordChangeRequired(t *testing.T) {
 	}
 	defer db.Close()
 
+	mock.ExpectBegin()
 	mock.ExpectExec(`(?s)UPDATE users\s+SET password_hash = \$1,\s+password_change_required_at = NULL,\s+temp_password_expires_at = NULL,\s+temp_password_issued_by = NULL\s+WHERE id = \$2`).
 		WithArgs("newhash", 42).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`UPDATE remember_sessions SET revoked_at = NOW\(\)`).
+		WithArgs(42).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	store := NewUserStore(sqlx.NewDb(db, "sqlmock"))
 	if err := store.ClearPasswordChangeRequired(42, "newhash"); err != nil {

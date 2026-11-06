@@ -198,6 +198,7 @@ func TestResetPasswordSucceeds(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow(12))
 	mock.ExpectExec(`UPDATE users SET password_hash`).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`UPDATE password_reset_tokens SET invalidated_at`).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`UPDATE remember_sessions SET revoked_at = NOW\(\)`).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	rec := postReset(t, h, testToken, "brandnewpassword")

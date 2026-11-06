@@ -35,9 +35,14 @@ func callChangePassword(h *Handlers, email, current, newPw string) *httptest.Res
 }
 
 func expectClearPasswordChangeRequired(mock sqlmock.Sqlmock, userID int) {
+	mock.ExpectBegin()
 	mock.ExpectExec(`(?s)UPDATE users\s+SET password_hash = \$1,\s+password_change_required_at = NULL,\s+temp_password_expires_at = NULL,\s+temp_password_issued_by = NULL\s+WHERE id = \$2`).
 		WithArgs(sqlmock.AnyArg(), userID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`UPDATE remember_sessions SET revoked_at = NOW\(\)`).
+		WithArgs(userID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 }
 
 func TestChangePassword_Succeeds(t *testing.T) {
