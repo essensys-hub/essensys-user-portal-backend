@@ -1,0 +1,90 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "lumieres-temporisees-2026-11-003",
+  "title": "Régler les temporisations des six lumières depuis les apps et le portail (cloud)",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#45",
+    "project_item": null
+  },
+  "git": {
+    "branch": "feat/lumieres-temporisees-2026-11-003",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "lumieres-temporisees-2026-11-003",
+    "path": "openspec/changes/lumieres-temporisees-2026-11-003",
+    "proposal": "openspec/changes/lumieres-temporisees-2026-11-003/proposal.md",
+    "design": "../essensys-feature-lifecycle/openspec/changes/lumieres-temporisees-2026-11-003/design.md",
+    "tasks": "openspec/changes/lumieres-temporisees-2026-11-003/tasks.md",
+    "specs": [
+      "openspec/changes/lumieres-temporisees-2026-11-003/specs/light-timers-cloud/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "internal/domain/lights_timers.go",
+      "internal/handlers/light_timers.go",
+      "internal/portal/routes.go",
+      "migrations/018_lights_timers_sync_profile.sql"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/api-routes.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/domain/lights_timers_test.go",
+      "internal/api/light_timers_test.go",
+      "internal/data/migration_lights_timers_test.go"
+    ],
+    "coverage_must_test": [
+      "six cles exactes 521 555 556 557 561 562",
+      "minutes entier 0 a 255 sinon 400 sans action",
+      "seul admin_local ou admin_global avec armoire liee ecrit",
+      "cle jamais lue vaut null et jamais 0",
+      "migration 018 idempotente sans UPDATE ni DELETE"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Temporisations des six lumières : lecture GET /portal/lights/timers et écriture réservée à l'administrateur de l'armoire (#53).",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "internal/domain/lights_timers.go",
+      "internal/handlers/light_timers.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": null,
+    "owner_security": "nrineau"
+  }
+}
