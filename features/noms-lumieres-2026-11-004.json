@@ -1,0 +1,95 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "noms-lumieres-2026-11-004",
+  "title": "Renommer les 33 lumières depuis les apps et les portails (cloud)",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#41",
+    "project_item": null
+  },
+  "git": {
+    "branch": "feat/noms-lumieres-2026-11-004",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "noms-lumieres-2026-11-004",
+    "path": "openspec/changes/noms-lumieres-2026-11-004",
+    "proposal": "openspec/changes/noms-lumieres-2026-11-004/proposal.md",
+    "design": "../essensys-feature-lifecycle/openspec/changes/noms-lumieres-2026-11-004/design.md",
+    "tasks": "openspec/changes/noms-lumieres-2026-11-004/tasks.md",
+    "specs": [
+      "openspec/changes/noms-lumieres-2026-11-004/specs/light-names-cloud/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "internal/domain/lights_names.go",
+      "internal/data/light_names_store.go",
+      "internal/handlers/light_names.go",
+      "internal/portal/routes.go",
+      "internal/gateway/routes.go",
+      "migrations/019_light_names.sql"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/api-routes.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/domain/lights_names_test.go",
+      "internal/data/light_names_store_test.go",
+      "internal/data/migration_light_names_test.go",
+      "internal/api/light_names_test.go"
+    ],
+    "coverage_must_test": [
+      "33 identifiants exacts du catalogue",
+      "nom rogne de 1 a 40 caracteres sans controle ni chevron",
+      "seul admin_local ou admin_global avec armoire liee ecrit",
+      "remise a zero = nom null avec version incrementee",
+      "fusion (updated_at, version, updated_by) et futur borne a 5 minutes",
+      "gateway sans jeton refusee en 401",
+      "migration 019 idempotente sans UPDATE ni DELETE"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Noms personnalisés des 33 lumières : lecture GET /portal/lights/names, écriture réservée à l'administrateur de l'armoire et synchronisation avec la gateway (#55).",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "internal/domain/lights_names.go",
+      "internal/handlers/light_names.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": null,
+    "owner_security": "nrineau"
+  }
+}
