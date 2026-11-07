@@ -139,7 +139,6 @@ type lightNameSyncEntry struct {
 	Name      json.RawMessage `json:"name"`
 	Version   int             `json:"version"`
 	UpdatedAt string          `json:"updated_at"`
-	UpdatedBy string          `json:"updated_by"`
 }
 
 // SyncLightNames merges the names sent by the authenticated gateway with the
@@ -176,7 +175,7 @@ func (h *Handler) SyncLightNames(w http.ResponseWriter, r *http.Request) {
 		if perr != nil {
 			continue
 		}
-		gw := domain.LightNameState{Version: in.Version, UpdatedBy: in.UpdatedBy,
+		gw := domain.LightNameState{Version: in.Version,
 			UpdatedAt: domain.ClampLightNameTime(at.UTC().Truncate(time.Millisecond), now)}
 		if s := string(in.Name); len(in.Name) > 0 && s != "null" {
 			var str string
@@ -190,10 +189,13 @@ func (h *Handler) SyncLightNames(w http.ResponseWriter, r *http.Request) {
 			gw.Name = n
 		}
 		cur, has := rows[in.ID]
+		// The request carries no author: on equal updated_at and version the
+		// stored cloud value is kept.
+		gw.UpdatedBy = cur.UpdatedBy
 		if has && !domain.LightNameNewer(gw, domain.LightNameState{Name: cur.Name, Version: cur.Version, UpdatedAt: cur.UpdatedAt, UpdatedBy: cur.UpdatedBy}) {
 			continue
 		}
-		merged := data.LightNameRow{LightID: in.ID, Name: gw.Name, Version: gw.Version, UpdatedAt: gw.UpdatedAt, UpdatedBy: gw.UpdatedBy}
+		merged := data.LightNameRow{LightID: in.ID, Name: gw.Name, Version: gw.Version, UpdatedAt: gw.UpdatedAt, UpdatedBy: "gateway"}
 		if err := h.store.PutLightNameExact(r.Context(), machineID, in.ID, merged); err != nil {
 			log.Printf("[gateway] light name merge %s: %v", in.ID, err)
 			writeLTError(w, http.StatusServiceUnavailable, "names_unavailable")

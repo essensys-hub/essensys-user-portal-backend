@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 )
 
 // noms-lumieres-2026-11-004 (#55): custom light names routes, through the real
@@ -343,7 +344,7 @@ func TestLightNamesSync_gatewayPlusRecenteGagne(t *testing.T) {
 	e.gatewaySetup(3)
 	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols).AddRow("wc1", "Vieux", 1, time.Date(2026, 11, 7, 10, 0, 0, 0, time.UTC), "a@example.org"))
 	gwAt := time.Date(2026, 11, 7, 10, 20, 0, 0, time.UTC)
-	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "wc1", "WC Haut", 2, gwAt, "").WillReturnResult(sqlmock.NewResult(1, 1))
+	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "wc1", "WC Haut", 2, gwAt, "gateway").WillReturnResult(sqlmock.NewResult(1, 1))
 	e.mock.ExpectExec(`INSERT INTO portal_audit_log`).WithArgs("gateway:gw-1", "light_name", sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 	rec := e.sync(`{"names":[{"id":"wc1","name":"WC Haut","version":2,"updated_at":"2026-11-07T10:20:00.000Z"}]}`, true)
 	if rec.Code != http.StatusOK {
@@ -362,7 +363,7 @@ func TestLightNamesSync_egaliteLeCloudReste(t *testing.T) {
 	e.gatewaySetup(3)
 	at := time.Date(2026, 11, 7, 10, 15, 0, 0, time.UTC)
 	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols).AddRow("wc1", "Cloud", 2, at, "a@example.org"))
-	rec := e.sync(`{"names":[{"id":"wc1","name":"Gateway","version":2,"updated_at":"2026-11-07T10:15:00.000Z","updated_by":"a@example.org"}]}`, true)
+	rec := e.sync(`{"names":[{"id":"wc1","name":"Gateway","version":2,"updated_at":"2026-11-07T10:15:00.000Z","updated_by":"zzz@example.org"}]}`, true)
 	if l := lnState(t, rec, "wc1"); l.Name == nil || *l.Name != "Cloud" {
 		t.Fatalf("tie: %+v", l)
 	}
@@ -375,7 +376,7 @@ func TestLightNamesSync_premierContactEnvoieSesNoms(t *testing.T) {
 	e := newLTEnv(t)
 	e.gatewaySetup(3)
 	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols))
-	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "salon", "Séjour", 1, sqlmock.AnyArg(), "").WillReturnResult(sqlmock.NewResult(1, 1))
+	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "salon", "Séjour", 1, sqlmock.AnyArg(), "gateway").WillReturnResult(sqlmock.NewResult(1, 1))
 	e.mock.ExpectExec(`INSERT INTO portal_audit_log`).WillReturnResult(sqlmock.NewResult(1, 1))
 	rec := e.sync(`{"names":[{"id":"salon","name":"Séjour","version":1,"updated_at":"2026-11-07T10:20:00.000Z"}]}`, true)
 	if l := lnState(t, rec, "salon"); l.Name == nil || *l.Name != "Séjour" {
@@ -387,7 +388,7 @@ func TestLightNamesSync_remiseAZeroSePropage(t *testing.T) {
 	e := newLTEnv(t)
 	e.gatewaySetup(3)
 	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols).AddRow("wc1", "Nom", 1, time.Date(2026, 11, 7, 10, 0, 0, 0, time.UTC), "a@example.org"))
-	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "wc1", nil, 2, sqlmock.AnyArg(), "").WillReturnResult(sqlmock.NewResult(1, 1))
+	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "wc1", nil, 2, sqlmock.AnyArg(), "gateway").WillReturnResult(sqlmock.NewResult(1, 1))
 	e.mock.ExpectExec(`INSERT INTO portal_audit_log`).WillReturnResult(sqlmock.NewResult(1, 1))
 	rec := e.sync(`{"names":[{"id":"wc1","name":null,"version":2,"updated_at":"2026-11-07T10:30:00.000Z"}]}`, true)
 	if l := lnState(t, rec, "wc1"); l.Name != nil || l.Version != 2 {
@@ -402,7 +403,7 @@ func TestLightNamesSync_horlogeDansLeFuturRamenee(t *testing.T) {
 	e := newLTEnv(t)
 	e.gatewaySetup(3)
 	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols))
-	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "wc1", "Futur", 1, sqlmock.AnyArg(), "").WillReturnResult(sqlmock.NewResult(1, 1))
+	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "wc1", "Futur", 1, sqlmock.AnyArg(), "gateway").WillReturnResult(sqlmock.NewResult(1, 1))
 	e.mock.ExpectExec(`INSERT INTO portal_audit_log`).WillReturnResult(sqlmock.NewResult(1, 1))
 	future := time.Now().UTC().Add(48 * time.Hour).Format("2006-01-02T15:04:05.000Z")
 	rec := e.sync(`{"names":[{"id":"wc1","name":"Futur","version":1,"updated_at":"`+future+`"}]}`, true)
@@ -426,7 +427,7 @@ func TestLightNamesSync_entreesInvalidesIgnorees(t *testing.T) {
 	e.gatewaySetup(3)
 	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols))
 	// Only the valid one is written.
-	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "sam", "Repas", 1, sqlmock.AnyArg(), "").WillReturnResult(sqlmock.NewResult(1, 1))
+	e.mock.ExpectExec(`INSERT INTO light_names`).WithArgs(3, "sam", "Repas", 1, sqlmock.AnyArg(), "gateway").WillReturnResult(sqlmock.NewResult(1, 1))
 	e.mock.ExpectExec(`INSERT INTO portal_audit_log`).WillReturnResult(sqlmock.NewResult(1, 1))
 	rec := e.sync(`{"names":[
 		{"id":"inconnue","name":"x","version":1,"updated_at":"2026-11-07T10:20:00.000Z"},
@@ -533,4 +534,68 @@ func (j jsonContains) Match(v driver.Value) bool {
 		}
 	}
 	return true
+}
+
+func TestLightNamesSync_entreeVierge33NEffacePasLeCloud(t *testing.T) {
+	e := newLTEnv(t)
+	e.gatewaySetup(3)
+	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols).AddRow("dressing", "WC 3", 2, time.Date(2026, 11, 7, 10, 0, 0, 0, time.UTC), "a@example.org"))
+	var b strings.Builder
+	b.WriteString(`{"names":[`)
+	for i, l := range lnIDs() {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`{"id":"` + l + `","name":null,"version":0,"updated_at":null}`)
+	}
+	b.WriteString(`]}`)
+	rec := e.sync(b.String(), true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	if l := lnState(t, rec, "dressing"); l.Name == nil || *l.Name != "WC 3" {
+		t.Fatalf("blank entries must not erase the cloud: %+v", l)
+	}
+	if err := e.mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("no write expected: %v", err)
+	}
+}
+
+func TestLightNamesSync_updatedAtAbsentIgnoree(t *testing.T) {
+	e := newLTEnv(t)
+	e.gatewaySetup(3)
+	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols))
+	rec := e.sync(`{"names":[{"id":"wc1","name":"x","version":3}]}`, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if err := e.mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLightNamesSync_reponseToujours33DansLOrdre(t *testing.T) {
+	e := newLTEnv(t)
+	e.gatewaySetup(3)
+	e.mock.ExpectQuery(`FROM light_names`).WillReturnRows(sqlmock.NewRows(lnCols).AddRow("idressing", "Placards", 1, time.Now(), "x"))
+	rec := e.sync(`{"names":[]}`, true)
+	var out struct {
+		Lights []lnView `json:"lights"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out.Lights) != 33 {
+		t.Fatalf("%d lights %v", len(out.Lights), err)
+	}
+	for i, id := range lnIDs() {
+		if out.Lights[i].ID != id {
+			t.Fatalf("[%d] %s want %s", i, out.Lights[i].ID, id)
+		}
+	}
+}
+
+func lnIDs() []string {
+	var ids []string
+	for _, e := range domain.LightNameCatalog() {
+		ids = append(ids, e.ID)
+	}
+	return ids
 }
