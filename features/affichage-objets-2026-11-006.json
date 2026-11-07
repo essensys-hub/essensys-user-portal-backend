@@ -1,0 +1,95 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "affichage-objets-2026-11-006",
+  "title": "Activer, désactiver et ordonner les lumières et les volets (cloud)",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#55",
+    "project_item": null
+  },
+  "git": {
+    "branch": "feat/affichage-objets-2026-11-006",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "affichage-objets-2026-11-006",
+    "path": "openspec/changes/affichage-objets-2026-11-006",
+    "proposal": "openspec/changes/affichage-objets-2026-11-006/proposal.md",
+    "design": "../essensys-feature-lifecycle/openspec/changes/affichage-objets-2026-11-006/design.md",
+    "tasks": "openspec/changes/affichage-objets-2026-11-006/tasks.md",
+    "specs": [
+      "openspec/changes/affichage-objets-2026-11-006/specs/object-layout-cloud/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "internal/domain/object_layout.go",
+      "internal/data/object_layout_store.go",
+      "internal/handlers/object_layout.go",
+      "internal/portal/routes.go",
+      "internal/gateway/routes.go",
+      "migrations/021_object_layout.sql"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/api-routes.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/domain/object_layout_test.go",
+      "internal/data/object_layout_store_test.go",
+      "internal/api/object_layout_test.go"
+    ],
+    "coverage_must_test": [
+      "33 lumieres et 16 volets : identifiants exacts du catalogue",
+      "identifiant inconnu ou de l'autre genre refuse, doublon refuse, order incomplet et tout desactive acceptes",
+      "seul admin_local ou admin_global avec armoire liee ecrit",
+      "reset = disposition par defaut avec version incrementee",
+      "fusion du document entier (updated_at, version, updated_by) et futur borne a 5 minutes",
+      "gateway sans jeton refusee en 401",
+      "migration 021 idempotente sans UPDATE ni DELETE",
+      "desactiver et reordonner ne change ni les noms ni leurs tables (NR-backend-17)"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Disposition des objets : GET /portal/{lights|shutters}/layout, écriture réservée à l'administrateur de l'armoire (activation et ordre) et synchronisation avec la gateway (#59).",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "internal/domain/object_layout.go",
+      "internal/handlers/object_layout.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": null,
+    "owner_security": "nrineau"
+  }
+}
