@@ -26,6 +26,7 @@ func Mount(r chi.Router, h *handlers.Handler, users *data.UserStore, injectLimit
 		r.Get("/history/latest", h.GetHistoryLatest)
 		r.Post("/web/actions", h.PostWebActions)
 		r.Get("/lights/timers", h.GetLightTimers)
+		r.Get("/lights/names", h.GetLightNames)
 
 		r.Get("/scenarios", h.ListScenarios)
 		r.Get("/scenarios/meta/bitmasks", h.GetScenarioBitmasks)
@@ -41,6 +42,7 @@ func Mount(r chi.Router, h *handlers.Handler, users *data.UserStore, injectLimit
 			r.Get("/gateway-sessions", h.ListGatewaySessions)
 			r.Post("/gateways/register", h.RegisterGateway)
 			r.Put("/lights/timers/{id}", h.PutLightTimer)
+			r.Put("/lights/names/{id}", h.PutLightName)
 		})
 		})
 	})
