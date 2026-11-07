@@ -16,6 +16,8 @@ Base URL prod : `https://mon.essensys.fr/api`
 | GET | `/portal/exchange` | JWT user |
 | GET | `/portal/history/latest` | JWT user |
 | POST | `/portal/web/actions` | JWT user |
+| GET | `/portal/lights/timers` | JWT user — les six temporisations des lumières (`minutes` 0 à 255, `null` si jamais lue) |
+| PUT | `/portal/admin/lights/timers/{id}` | JWT admin — `{"minutes":n}`, réservé à `admin_local` (ou `admin_global`) avec armoire liée ; 400 `invalid_minutes` / `unknown_light`, 403 `forbidden` ; mode test : `status` `dry_run` |
 | POST | `/portal/admin/link-requests/{id}/approve` | JWT admin |
 | POST | `/portal/admin/gateways/register` | JWT admin |
 
