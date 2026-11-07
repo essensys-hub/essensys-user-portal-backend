@@ -1,0 +1,8 @@
+## 1. Cloud : noms des volets (essensys-user-portal-backend) (#57)
+
+- [x] 1.1 Ajouter le catalogue des 16 volets et stores (`id`, nom d'origine, ordre, voir design) et la validation du nom (réutiliser la règle des lumières : rogné, 1 à 40 caractères, sans contrôle ni `<` `>`) ; vérifier par des tests de domaine (16 identifiants exacts, `voletstore` garde ses guillemets, 40 accepté, 41 refusé, balise refusée, vide = remise à zéro, un identifiant de lumière est refusé)
+- [x] 1.2 Ajouter la migration idempotente `020_shutter_names.sql` (table `shutter_names`) et le magasin ; vérifier par un test de migration (rejouée deux fois, `light_names` inchangée) et des tests du magasin
+- [x] 1.3 Ajouter `GET /portal/shutters/names` ; vérifier par des tests (16 éléments sous la clé `shutters`, `null` par défaut, 403 sans armoire liée)
+- [x] 1.4 Ajouter `PUT /portal/admin/shutters/names/{id}` (administrateur de l'armoire, version, audit `shutter_name`, dry-run) ; vérifier par des tests de routage (admin_local de l'armoire accepté, user et autre armoire 403, remise à zéro, 400 `unknown_shutter` et `invalid_name`, dry-run sans écriture)
+- [x] 1.5 Ajouter `POST /gateway/shutters/names/sync` avec la fusion (plus grand `(updated_at, version, updated_by)`, égalité = valeur du cloud, futur borné à 5 minutes) ; vérifier par des tests (cloud plus récent, gateway plus récente, égalité, horloge dans le futur, 401 sans jeton)
+- [x] 1.6 Ajouter le test de non-régression `NR-backend-16` (renommer un volet ne change ni `GET /portal/lights/names` ni la table `light_names`) ; vérifier par `go test ./...` vert, `NR-backend-15` de #41 inclus

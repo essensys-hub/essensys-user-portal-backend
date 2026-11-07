@@ -1,0 +1,96 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "noms-volets-2026-11-005",
+  "title": "Renommer les 16 volets et stores depuis les apps et les portails (cloud)",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#52",
+    "project_item": null
+  },
+  "git": {
+    "branch": "feat/noms-volets-2026-11-005",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "noms-volets-2026-11-005",
+    "path": "openspec/changes/noms-volets-2026-11-005",
+    "proposal": "openspec/changes/noms-volets-2026-11-005/proposal.md",
+    "design": "../essensys-feature-lifecycle/openspec/changes/noms-volets-2026-11-005/design.md",
+    "tasks": "openspec/changes/noms-volets-2026-11-005/tasks.md",
+    "specs": [
+      "openspec/changes/noms-volets-2026-11-005/specs/shutter-names-cloud/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "internal/domain/shutters_names.go",
+      "internal/data/shutter_names_store.go",
+      "internal/handlers/shutter_names.go",
+      "internal/portal/routes.go",
+      "internal/gateway/routes.go",
+      "migrations/020_shutter_names.sql"
+    ],
+    "primary_surface": "api"
+  },
+  "userguide": {
+    "pages": [
+      "docs/api-routes.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [
+      "internal/domain/shutters_names_test.go",
+      "internal/data/shutter_names_store_test.go",
+      "internal/data/migration_shutter_names_test.go",
+      "internal/api/shutter_names_test.go"
+    ],
+    "coverage_must_test": [
+      "16 identifiants exacts du catalogue",
+      "nom rogne de 1 a 40 caracteres sans controle ni chevron",
+      "seul admin_local ou admin_global avec armoire liee ecrit",
+      "remise a zero = nom null avec version incrementee",
+      "fusion (updated_at, version, updated_by) et futur borne a 5 minutes",
+      "gateway sans jeton refusee en 401",
+      "migration 020 idempotente sans UPDATE ni DELETE",
+      "renommer un volet ne change ni les routes ni la table des lumieres (NR-backend-16)"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Noms personnalisés des 16 volets et stores : lecture GET /portal/shutters/names, écriture réservée à l'administrateur de l'armoire et synchronisation avec la gateway (#57).",
+    "target_tag": null,
+    "surfaces": [
+      "essensys-user-portal-backend"
+    ],
+    "paths": [
+      "internal/domain/shutters_names.go",
+      "internal/handlers/shutter_names.go"
+    ]
+  },
+  "security": {
+    "sca_tool": "dependabot",
+    "dependabot_alerts_url": null,
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "clean",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": null,
+    "owner_security": "nrineau"
+  }
+}
