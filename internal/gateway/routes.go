@@ -20,6 +20,7 @@ func Mount(r chi.Router, h *handlers.Handler, store *data.PortalStore) {
 		r.With(auth).Post("/sync-runs/{id}/start", h.SyncRunStart)
 		r.With(auth).Post("/sync-runs/{id}/progress", h.SyncRunProgress)
 		r.With(auth).Post("/lights/names/sync", h.SyncLightNames)
+		r.With(auth).Post("/shutters/names/sync", h.SyncShutterNames)
 		r.With(auth).Patch("/sync-profiles/scenarios", h.PatchScenariosSyncProfile)
 	})
 }
