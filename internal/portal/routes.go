@@ -28,6 +28,8 @@ func Mount(r chi.Router, h *handlers.Handler, users *data.UserStore, injectLimit
 		r.Get("/lights/timers", h.GetLightTimers)
 		r.Get("/lights/names", h.GetLightNames)
 		r.Get("/shutters/names", h.GetShutterNames)
+		r.Get("/lights/layout", h.GetLightsLayout)
+		r.Get("/shutters/layout", h.GetShuttersLayout)
 
 		r.Get("/scenarios", h.ListScenarios)
 		r.Get("/scenarios/meta/bitmasks", h.GetScenarioBitmasks)
@@ -45,6 +47,8 @@ func Mount(r chi.Router, h *handlers.Handler, users *data.UserStore, injectLimit
 			r.Put("/lights/timers/{id}", h.PutLightTimer)
 			r.Put("/lights/names/{id}", h.PutLightName)
 			r.Put("/shutters/names/{id}", h.PutShutterName)
+			r.Put("/lights/layout", h.PutLightsLayout)
+			r.Put("/shutters/layout", h.PutShuttersLayout)
 		})
 		})
 	})
