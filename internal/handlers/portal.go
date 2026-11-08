@@ -13,6 +13,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/push"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/testmode"
 	"github.com/go-chi/chi/v5"
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -22,13 +23,20 @@ type Handler struct {
 	store            *data.PortalStore
 	inventory        *data.AdminInventoryStore
 	exchangeStaleTTL time.Duration
+	// Doorbell push (sonnette-plages-push-2026-11-008, #61).
+	push  *push.Dispatcher
+	rings *ringLimiter
 }
+
+// SetPush gives the handler its notification senders (nil providers are fine:
+// rings are then accepted and nothing is sent).
+func (h *Handler) SetPush(d *push.Dispatcher) { h.push = d }
 
 func NewHandler(store *data.PortalStore, inventory *data.AdminInventoryStore, exchangeStaleTTL time.Duration) *Handler {
 	if exchangeStaleTTL <= 0 {
 		exchangeStaleTTL = 120 * time.Second
 	}
-	return &Handler{store: store, inventory: inventory, exchangeStaleTTL: exchangeStaleTTL}
+	return &Handler{store: store, inventory: inventory, exchangeStaleTTL: exchangeStaleTTL, rings: newRingLimiter(doorbellRingInterval)}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +160,7 @@ func (h *Handler) PortalSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := domain.NewPortalSessionResponse(userInfo, portalAccess, gateway, armoire, time.Now())
+	resp.GatewayState = h.gatewayState(r.Context(), user)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -527,4 +536,17 @@ func newGUID() string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b[:4]) + "-" + hex.EncodeToString(b[4:6]) + "-" +
 		hex.EncodeToString(b[6:8]) + "-" + hex.EncodeToString(b[8:10]) + "-" + hex.EncodeToString(b[10:])
+}
+
+// gatewayState : "none" sans gateway liée ou éligible, sinon "online"/"offline"
+// (même seuil que GET /gateway/status).
+func (h *Handler) gatewayState(ctx context.Context, user *domain.UserProfile) string {
+	if user == nil || !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+		return domain.GatewayStateNone
+	}
+	online, _ := h.store.IsGatewayOnline(ctx, *user.LinkedGatewayID, domain.OnlineTimeout)
+	if online {
+		return domain.GatewayStateOnline
+	}
+	return domain.GatewayStateOffline
 }

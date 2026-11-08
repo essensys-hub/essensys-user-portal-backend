@@ -1,8 +1,8 @@
 package gateway
 
 import (
-	"github.com/essensys-hub/essensys-user-portal-backend/internal/handlers"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/handlers"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
 	"github.com/go-chi/chi/v5"
 )
@@ -23,6 +23,7 @@ func Mount(r chi.Router, h *handlers.Handler, store *data.PortalStore) {
 		r.With(auth).Post("/shutters/names/sync", h.SyncShutterNames)
 		r.With(auth).Post("/lights/layout/sync", h.SyncLightsLayout)
 		r.With(auth).Post("/shutters/layout/sync", h.SyncShuttersLayout)
+		r.With(auth).Post("/doorbell/ring", h.DoorbellRing)
 		r.With(auth).Patch("/sync-profiles/scenarios", h.PatchScenariosSyncProfile)
 	})
 }

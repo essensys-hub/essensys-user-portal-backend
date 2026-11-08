@@ -48,13 +48,15 @@ type PortalSessionResponse struct {
 	User         PortalUserInfo     `json:"user"`
 	PortalAccess bool               `json:"portal_access"`
 	Gateway      *PortalGatewayInfo `json:"gateway,omitempty"`
+	// GatewayState : "none" | "offline" | "online" (le bloc gateway est conservé).
+	GatewayState string             `json:"gateway_state"`
 	Armoire      *PortalArmoireInfo `json:"armoire,omitempty"`
 }
 
 // NewPortalSessionResponse assemble la réponse de GET /api/portal/session.
 // gateway est nil sans gateway liée ; armoire est nil sans armoire résolue ou sans accès au portail.
 func NewPortalSessionResponse(user PortalUserInfo, portalAccess bool, gateway *PortalGatewayInfo, armoire *MachineDetail, now time.Time) PortalSessionResponse {
-	resp := PortalSessionResponse{User: user, PortalAccess: portalAccess, Gateway: gateway}
+	resp := PortalSessionResponse{User: user, PortalAccess: portalAccess, Gateway: gateway, GatewayState: GatewayStateNone}
 	if portalAccess && armoire != nil {
 		resp.Armoire = &PortalArmoireInfo{
 			ID:          armoire.ID,
@@ -67,4 +69,23 @@ func NewPortalSessionResponse(user PortalUserInfo, portalAccess bool, gateway *P
 		}
 	}
 	return resp
+}
+
+// Valeurs de gateway_state (sonnette-plages-push-2026-11-008, #61).
+const (
+	GatewayStateNone    = "none"
+	GatewayStateOffline = "offline"
+	GatewayStateOnline  = "online"
+)
+
+// GatewayState dit si une gateway est liée (et éligible), puis son état.
+// lastSeen est le dernier battement connu (zéro si inconnu).
+func GatewayState(linked *string, lastSeen, now time.Time) string {
+	if !IsRemoteEligibleGateway(linked) {
+		return GatewayStateNone
+	}
+	if IsOnline(lastSeen, now, OnlineTimeout) {
+		return GatewayStateOnline
+	}
+	return GatewayStateOffline
 }

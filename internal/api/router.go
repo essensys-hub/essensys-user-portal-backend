@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/admin"
@@ -12,6 +13,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/legacyiot"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/mailtpl"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/portal"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/push"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/support"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -26,6 +28,13 @@ type Option func(*routerOptions)
 type routerOptions struct {
 	support  *support.Service
 	remember *data.RememberSessionStore
+	push     *push.Dispatcher
+}
+
+// WithPush replaces the notification senders built from the configuration
+// (tests use fake providers).
+func WithPush(d *push.Dispatcher) Option {
+	return func(o *routerOptions) { o.push = d }
 }
 
 // WithRememberSessions enables the 30-day remembered sessions (consolidated mode only).
@@ -44,6 +53,10 @@ func NewRouter(store *data.PortalStore, users *data.UserStore, audit *data.Audit
 		opt(&o)
 	}
 	h := handlers.NewHandler(store, inventory, cfg.ExchangeStaleTTL)
+	if o.push == nil {
+		o.push = push.NewDispatcher(context.Background(), cfg)
+	}
+	h.SetPush(o.push)
 	r := chi.NewRouter()
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Logger)
