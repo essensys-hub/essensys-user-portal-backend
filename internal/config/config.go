@@ -30,31 +30,38 @@ func Load() Config {
 		envName = env("APP_ENV", "")
 	}
 	return Config{
-		ConsolidatedMode:    envBool("CONSOLIDATED_MODE", false),
-		ExchangeStaleTTL:    envDurationSeconds("EXCHANGE_STALE_TTL_SECONDS", 120),
-		DBHost:              env("DB_HOST", "127.0.0.1"),
-		DBPort:              env("DB_PORT", "5432"),
-		DBUser:              env("DB_USER", "essensys"),
-		DBPassword:          env("DB_PASSWORD", ""),
-		DBName:              env("DB_NAME", "essensys_db"),
-		Port:                env("PORT", "8081"),
-		MigrationsDir:       env("MIGRATIONS_DIR", "migrations"),
-		CORSOrigin:          env("CORS_ORIGIN", "https://mon.essensys.fr"),
-		JWTSecret:           env("JWT_SECRET", ""),
-		AdminToken:          env("ADMIN_TOKEN", ""),
-		Environment:         envName,
-		TurnstileSecretKey:  env("TURNSTILE_SECRET_KEY", ""),
-		TurnstileDisabled:   envBool("TURNSTILE_DISABLED", false),
-		RegisterRateLimit:   envInt("REGISTER_RATE_LIMIT", 5),
-		RegisterRateWindow:  envDurationSeconds("REGISTER_RATE_WINDOW_SECONDS", 3600),
-		SupportPseudonymKey: env("SUPPORT_PSEUDONYM_KEY", ""),
-		SupportPublicRepo:   env("SUPPORT_PUBLIC_REPO", "essensys-hub/essensys-support-site"),
-		SupportPrivateRepo:  env("SUPPORT_PRIVATE_REPO", "essensys-hub/essensys-support"),
-		SupportProjectID:    env("SUPPORT_PROJECT_ID", ""),
-		GitHubAppID:         env("GITHUB_APP_ID", ""),
-		GitHubInstallation:  env("GITHUB_APP_INSTALLATION_ID", ""),
-		GitHubAppKeyFile:    env("GITHUB_APP_PRIVATE_KEY_FILE", ""),
-		GitHubAPIURL:        env("GITHUB_API_URL", "https://api.github.com"),
+		ConsolidatedMode:      envBool("CONSOLIDATED_MODE", false),
+		ExchangeStaleTTL:      envDurationSeconds("EXCHANGE_STALE_TTL_SECONDS", 120),
+		DBHost:                env("DB_HOST", "127.0.0.1"),
+		DBPort:                env("DB_PORT", "5432"),
+		DBUser:                env("DB_USER", "essensys"),
+		DBPassword:            env("DB_PASSWORD", ""),
+		DBName:                env("DB_NAME", "essensys_db"),
+		Port:                  env("PORT", "8081"),
+		MigrationsDir:         env("MIGRATIONS_DIR", "migrations"),
+		CORSOrigin:            env("CORS_ORIGIN", "https://mon.essensys.fr"),
+		JWTSecret:             env("JWT_SECRET", ""),
+		AdminToken:            env("ADMIN_TOKEN", ""),
+		Environment:           envName,
+		TurnstileSecretKey:    env("TURNSTILE_SECRET_KEY", ""),
+		TurnstileDisabled:     envBool("TURNSTILE_DISABLED", false),
+		RegisterRateLimit:     envInt("REGISTER_RATE_LIMIT", 5),
+		RegisterRateWindow:    envDurationSeconds("REGISTER_RATE_WINDOW_SECONDS", 3600),
+		SupportPseudonymKey:   env("SUPPORT_PSEUDONYM_KEY", ""),
+		SupportPublicRepo:     env("SUPPORT_PUBLIC_REPO", "essensys-hub/essensys-support-site"),
+		SupportPrivateRepo:    env("SUPPORT_PRIVATE_REPO", "essensys-hub/essensys-support"),
+		SupportProjectID:      env("SUPPORT_PROJECT_ID", ""),
+		GitHubAppID:           env("GITHUB_APP_ID", ""),
+		GitHubInstallation:    env("GITHUB_APP_INSTALLATION_ID", ""),
+		GitHubAppKeyFile:      env("GITHUB_APP_PRIVATE_KEY_FILE", ""),
+		GitHubAPIURL:          env("GITHUB_API_URL", "https://api.github.com"),
+		FCMServiceAccountJSON: env("FCM_SERVICE_ACCOUNT_JSON", ""),
+		FCMProjectID:          env("FCM_PROJECT_ID", ""),
+		APNsKeyP8:             env("APNS_KEY_P8", ""),
+		APNsKeyID:             env("APNS_KEY_ID", ""),
+		APNsTeamID:            env("APNS_TEAM_ID", ""),
+		APNsBundleID:          env("APNS_BUNDLE_ID", "essensys.essensys-iphone"),
+		APNsEnvironment:       env("APNS_ENV", "production"),
 	}
 }
 
@@ -140,6 +147,15 @@ type Config struct {
 	GitHubInstallation  string
 	GitHubAppKeyFile    string
 	GitHubAPIURL        string
+	// Push notifications (sonnette-plages-push-2026-11-008, #61). A provider
+	// with missing settings is disabled: rings are accepted, nothing is sent.
+	FCMServiceAccountJSON string // content of the service account JSON
+	FCMProjectID          string
+	APNsKeyP8             string // content of the .p8 key
+	APNsKeyID             string
+	APNsTeamID            string
+	APNsBundleID          string
+	APNsEnvironment       string // production | development
 }
 
 // GitHubAppConfigured reports whether the support module can reach GitHub.
