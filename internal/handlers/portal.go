@@ -13,6 +13,7 @@ import (
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/data"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/domain"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/middleware"
+	"github.com/essensys-hub/essensys-user-portal-backend/internal/push"
 	"github.com/essensys-hub/essensys-user-portal-backend/internal/testmode"
 	"github.com/go-chi/chi/v5"
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -22,13 +23,20 @@ type Handler struct {
 	store            *data.PortalStore
 	inventory        *data.AdminInventoryStore
 	exchangeStaleTTL time.Duration
+	// Doorbell push (sonnette-plages-push-2026-11-008, #61).
+	push  *push.Dispatcher
+	rings *ringLimiter
 }
+
+// SetPush gives the handler its notification senders (nil providers are fine:
+// rings are then accepted and nothing is sent).
+func (h *Handler) SetPush(d *push.Dispatcher) { h.push = d }
 
 func NewHandler(store *data.PortalStore, inventory *data.AdminInventoryStore, exchangeStaleTTL time.Duration) *Handler {
 	if exchangeStaleTTL <= 0 {
 		exchangeStaleTTL = 120 * time.Second
 	}
-	return &Handler{store: store, inventory: inventory, exchangeStaleTTL: exchangeStaleTTL}
+	return &Handler{store: store, inventory: inventory, exchangeStaleTTL: exchangeStaleTTL, rings: newRingLimiter(doorbellRingInterval)}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
