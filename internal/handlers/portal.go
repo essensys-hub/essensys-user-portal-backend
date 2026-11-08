@@ -152,6 +152,7 @@ func (h *Handler) PortalSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := domain.NewPortalSessionResponse(userInfo, portalAccess, gateway, armoire, time.Now())
+	resp.GatewayState = h.gatewayState(r.Context(), user)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -527,4 +528,17 @@ func newGUID() string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b[:4]) + "-" + hex.EncodeToString(b[4:6]) + "-" +
 		hex.EncodeToString(b[6:8]) + "-" + hex.EncodeToString(b[8:10]) + "-" + hex.EncodeToString(b[10:])
+}
+
+// gatewayState : "none" sans gateway liée ou éligible, sinon "online"/"offline"
+// (même seuil que GET /gateway/status).
+func (h *Handler) gatewayState(ctx context.Context, user *domain.UserProfile) string {
+	if user == nil || !domain.IsRemoteEligibleGateway(user.LinkedGatewayID) {
+		return domain.GatewayStateNone
+	}
+	online, _ := h.store.IsGatewayOnline(ctx, *user.LinkedGatewayID, domain.OnlineTimeout)
+	if online {
+		return domain.GatewayStateOnline
+	}
+	return domain.GatewayStateOffline
 }
