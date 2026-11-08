@@ -57,6 +57,9 @@ func TestFCM_formatDeLaRequete(t *testing.T) {
 	if a["priority"] != "HIGH" || a["notification"].(map[string]any)["channel_id"] != "doorbell" {
 		t.Fatalf("android: %v", a)
 	}
+	if a["notification"].(map[string]any)["tag"] != "ring-1" {
+		t.Fatalf("android tag must be the ring_id: %v", a)
+	}
 }
 
 func TestFCM_UNREGISTEREDEtErreurs(t *testing.T) {
@@ -191,6 +194,9 @@ func TestAPNs_formatDeLaRequete(t *testing.T) {
 	}
 	if hdr.Get("Apns-Topic") != "essensys.essensys-iphone" || hdr.Get("Apns-Push-Type") != "alert" || hdr.Get("Apns-Priority") != "10" {
 		t.Fatalf("headers: %v", hdr)
+	}
+	if hdr.Get("Apns-Collapse-Id") != "ring-1" {
+		t.Fatalf("collapse id must be the ring_id: %v", hdr)
 	}
 	raw := strings.TrimPrefix(hdr.Get("Authorization"), "bearer ")
 	tok, err := jwt.Parse(raw, func(tk *jwt.Token) (any, error) {

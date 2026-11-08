@@ -75,6 +75,9 @@ type fcmAndroid struct {
 	Priority     string `json:"priority"`
 	Notification struct {
 		ChannelID string `json:"channel_id"`
+		// Tag replaces a notification already shown with the same tag, so two
+		// deliveries of one ring collapse into one on the device.
+		Tag string `json:"tag,omitempty"`
 	} `json:"notification"`
 }
 
@@ -87,6 +90,7 @@ func (f *FCMSender) Send(ctx context.Context, token string, msg Message) error {
 		Android:      fcmAndroid{Priority: "HIGH"},
 	}
 	m.Android.Notification.ChannelID = AndroidChannel
+	m.Android.Notification.Tag = msg.RingID
 	body, err := json.Marshal(fcmRequest{Message: m})
 	if err != nil {
 		return err
