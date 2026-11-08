@@ -469,3 +469,44 @@ func TestDoorbellRing_fcmEnPanneNeBloquePasLiPhone(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// NR: NR-backend-18 essensys-hub/essensys-feature-lifecycle#61
+// Un appui de sonnette est toujours accepté par le cloud : même si les deux
+// fournisseurs sont en panne, la gateway reçoit 200 et aucun jeton n'apparaît
+// dans la réponse ni dans le journal. Le bloc d'état historique de /session
+// (user, portal_access) reste servi à côté de gateway_state.
+func TestNR_backend_18_appuiToujoursAccepteEtSessionCompatible(t *testing.T) {
+	logs := captureLog(t)
+	fcm := newFakeProvider(t, false, 500, `{"error":{"status":"INTERNAL"}}`)
+	apns := newFakeProvider(t, true, 503, ``)
+	e := newPushEnv(t, fakeDispatcher(t, fcm, apns))
+	e.ringAuth("gw-1")
+	e.ringSeen("gw-1", "ring-nr", false)
+	e.ringRecipients("gw-1", androidDev(12), iosDev(13))
+	e.ringRecorded("gw-1", "ring-nr")
+	rec := e.ring(`{"ring_id":"ring-nr","at":"2026-11-08T10:15:30Z"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("a provider outage must not reach the gateway: %d %s", rec.Code, rec.Body.String())
+	}
+	if st, n := ringResp(t, rec); st != "accepted" || n != 0 {
+		t.Fatalf("%q %d", st, n)
+	}
+	for _, s := range []string{rec.Body.String(), logs.String()} {
+		if strings.Contains(s, drAndroidToken) || strings.Contains(s, drIOSToken) {
+			t.Fatal("no device token in a response or a log")
+		}
+	}
+
+	s := newSessionEnv(t, false)
+	s.pushUser(7, "a@example.org", nil)
+	raw := s.do(t, http.MethodGet, sessionPath, "a@example.org", "user", "").Body.String()
+	var session map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &session); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"user", "portal_access", "gateway_state"} {
+		if _, ok := session[k]; !ok {
+			t.Fatalf("session lost %q: %s", k, raw)
+		}
+	}
+}
