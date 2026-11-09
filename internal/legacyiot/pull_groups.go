@@ -14,3 +14,11 @@ var IdentityIndices = []int{
 	945,
 	947, 948, 949, 950, 951, 952,
 }
+
+// IndexSecurityOutletsState is Securite_PriseCoupe: 1 = outlets cut, 0 = piloted (security-outlets-2026-10-011).
+// Behind a gateway it is read by the gateway; without one the cloud must ask for it itself
+// (essensys-user-portal-backend#63), otherwise the apps stay on "État inconnu".
+const IndexSecurityOutletsState = 440
+
+// SecurityOutletsIndices: security outlets state, a short chunk of its own in the serverinfos rotation.
+var SecurityOutletsIndices = []int{IndexSecurityOutletsState}

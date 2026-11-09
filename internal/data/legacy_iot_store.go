@@ -84,7 +84,16 @@ func (s *LegacyIoTStore) UpdateMachineStatus(hashedPkey, ip, rawAuth, rawDecoded
 }
 
 func (s *LegacyIoTStore) SaveClientData(clientID, hashedPkey, version string, ek []domain.ExchangeKeyValue) error {
-	ekJSON, err := json.Marshal(ek)
+	// Each MyStatus only carries the chunk of indices asked by the serverinfos rotation: keep the others.
+	merged := ek
+	var stored json.RawMessage
+	if err := s.db.Get(&stored, `SELECT ek FROM machine_telemetry WHERE client_id = $1`, clientID); err == nil {
+		var existing []domain.ExchangeKeyValue
+		if json.Unmarshal(stored, &existing) == nil {
+			merged = MergeTelemetryEK(existing, ek)
+		}
+	}
+	ekJSON, err := json.Marshal(merged)
 	if err != nil {
 		return err
 	}

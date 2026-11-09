@@ -2,7 +2,7 @@ package legacyiot
 
 import "sync"
 
-// InfoRotator cycles serverinfos index lists (default commands + identity/MAC).
+// InfoRotator cycles serverinfos index lists (default commands, identity/MAC, security outlets state).
 type InfoRotator struct {
 	mu    sync.Mutex
 	slots [][]int
@@ -14,6 +14,7 @@ func NewInfoRotator() *InfoRotator {
 		slots: [][]int{
 			DefaultCommandIndices,
 			IdentityIndices,
+			SecurityOutletsIndices,
 		},
 	}
 }
