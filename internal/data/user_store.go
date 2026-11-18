@@ -156,6 +156,42 @@ func (s *UserStore) UpdateUserLinks(userID int, machineID *int, gatewayID *strin
 	return err
 }
 
+// UpdateUserLinksByAdmin applies an admin assignment and keeps link_requests in
+// step with it, in one transaction (essensys-user-portal-backend#66). Portal
+// access needs both the links and an approved link request: an assignment that
+// makes the account eligible records an approved request (once), and one that
+// makes it ineligible revokes the approved ones.
+func (s *UserStore) UpdateUserLinksByAdmin(userID int, machineID *int, gatewayID *string, armoireID *int, reviewer string) error {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`UPDATE users SET linked_machine_id = $1, linked_gateway_id = $2, linked_armoire_id = $3 WHERE id = $4`,
+		machineID, gatewayID, armoireID, userID); err != nil {
+		return err
+	}
+	if domain.UserPortalAccessEligible(machineID, gatewayID, armoireID) {
+		if _, err := tx.Exec(`
+			INSERT INTO link_requests (user_id, machine_serial, message, status, reviewed_by, reviewed_at)
+			SELECT $1, $2, $3, $4, $5, NOW()
+			WHERE NOT EXISTS (SELECT 1 FROM link_requests WHERE user_id = $1 AND status = $4)`,
+			userID, fmt.Sprintf("machine-%d", *machineID), "Affectation par un administrateur",
+			domain.LinkStatusApproved, reviewer); err != nil {
+			return err
+		}
+	} else {
+		if _, err := tx.Exec(`
+			UPDATE link_requests SET status = $1, reviewed_by = $2, reviewed_at = NOW()
+			WHERE user_id = $3 AND status = $4`,
+			domain.LinkStatusRevoked, reviewer, userID, domain.LinkStatusApproved); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // SetTemporaryPassword installs an admin-issued temporary password: it
 // overwrites the credential and marks the account as needing a change in the
 // same statement, so the two can never be observed out of sync by a

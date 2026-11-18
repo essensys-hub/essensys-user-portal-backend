@@ -307,7 +307,7 @@ func (h *Handlers) UpdateUserLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	if err := h.users.UpdateUserLinks(id, req.MachineID, req.GatewayID, req.ArmoireID); err != nil {
+	if err := h.users.UpdateUserLinksByAdmin(id, req.MachineID, req.GatewayID, req.ArmoireID, email); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
