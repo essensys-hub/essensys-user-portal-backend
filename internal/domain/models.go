@@ -54,6 +54,7 @@ const (
 	LinkStatusPending  = "pending"
 	LinkStatusApproved = "approved"
 	LinkStatusRejected = "rejected"
+	LinkStatusRevoked  = "revoked"
 
 	ActionStatusPending   = "pending"
 	ActionStatusDelivered = "delivered"
